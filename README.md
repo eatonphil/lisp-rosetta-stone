@@ -28,12 +28,14 @@ $ java -cp . Main "$(cat ../test.lisp)"
 144
 ```
 
-## C# (Coming Soon)
+## C#
+
+246 lines of code.
 
 ```bash
 $ cd csharp
-$ dotnet Main.cs
-$ ./a.out "$(cat ../test.lisp)"
+$ dotnet run "$(cat ../test.lisp)"
+144
 ```
 
 ## TypeScript
