@@ -3,8 +3,6 @@
 This repo contains implementations of a tree-walking lisp interpreter capable of running the following program:
 
 ```lisp
-(def sum (lambda (a b) (+ a b)))
-
 (def fib (lambda (n)
   (if (<= n 2)
       1
