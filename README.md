@@ -50,6 +50,14 @@ $ node lisp.js "$(cat ../test.lisp)"
 144
 ```
 
-## Go (Coming Soon)
+## Go
+
+272 lines of code.
+
+```bash
+$ cd go
+$ go run lisp.go "$(cat ../test.lisp)"
+144
+```
 
 ## Python (Coming Soon)
