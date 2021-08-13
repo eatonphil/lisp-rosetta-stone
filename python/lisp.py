@@ -87,7 +87,6 @@ def lex(program: str) -> list[Token]:
             continue
 
         lexers = [lex_integer, lex_identifier]
-        found = False
         for lexer in lexers:
             new_cursor, token = lexer(program, i)
             if new_cursor == i:
@@ -95,10 +94,8 @@ def lex(program: str) -> list[Token]:
 
             i = new_cursor
             tokens.append(token)
-            found = True
             break
-
-        if not found:
+        else:
             raise Exception(f"Unknown token near '{program[i:]}' at index '{i}'")
 
     return tokens
