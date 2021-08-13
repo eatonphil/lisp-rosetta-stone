@@ -161,9 +161,7 @@ def builtin_lambda(args: Sexp, _) -> Any:
 
     def _lambda_internal(call_args: Sexp, call_ctx: dict[str, Any]) -> Any:
         evalled_call_args = eval_lisp_args(call_args, call_ctx)
-        child_call_ctx = {}
-        for key, val in call_ctx.items():
-            child_call_ctx[key] = val
+        child_call_ctx = call_ctx.copy()
 
         i = 0
         it = params
@@ -238,8 +236,8 @@ def main():
     begin = sexp_append(begin, None)
 
     cursor = -1
-    while cursor != len(tokens)-1:
-        cursor, child = parse(tokens, cursor+1)
+    while cursor < len(tokens) - 1:
+        cursor, child = parse(tokens, cursor + 1)
         begin = sexp_append(begin, child)
 
     result = eval_lisp(begin, {})
