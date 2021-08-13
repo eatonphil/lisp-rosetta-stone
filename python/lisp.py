@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import Any, Tuple
+from typing import Any, Optional, Tuple
 
 
 class TokenKind(Enum):
@@ -8,7 +8,7 @@ class TokenKind(Enum):
     IDENTIFIER = 2
     SYNTAX = 3
 
-    
+
 class Token():
     value: str
     kind: TokenKind
@@ -43,7 +43,7 @@ class Sexp():
         return f'({self.pair[0].pretty()} . {self.pair[1].pretty()})'
 
 
-def sexp_append(first: Sexp, second: Sexp) -> Sexp:
+def sexp_append(first: Optional[Sexp], second: Optional[Sexp]) -> Sexp:
     if first is None:
         return Sexp(SexpKind.PAIR, None, [second, None])
 
@@ -63,7 +63,7 @@ def lex_integer(program: str, cursor: int) -> Tuple[int, Token]:
 
     return end, Token(program[cursor:end], TokenKind.INTEGER)
 
-    
+
 def lex_identifier(program: str, cursor: int) -> Tuple[int, Token]:
     c = program[cursor]
     end = cursor
@@ -104,12 +104,12 @@ def lex(program: str) -> list[Token]:
             break
 
         if not found:
-            raise Exception(fmt.Sprintf("Unknown token near '%s' at index '%d'", program[i:], i))
+            raise Exception(f"Unknown token near '{program[i:]}' at index '{i}'")
 
     return tokens
 
 
-def parse(tokens: list[Token], cursor: int) -> Tuple[int, Sexp]:
+def parse(tokens: list[Token], cursor: int) -> Tuple[int, Optional[Sexp]]:
     siblings = None
 
     if tokens[cursor].value != "(":
@@ -196,10 +196,9 @@ def builtin_begin(args: Sexp, ctx: dict[str, Any]) -> Any:
     return res
 
 
-def builtin_plus(args: Sexp, ctx: dict[str, any]) -> Any:
+def builtin_plus(args: Sexp, ctx: dict[str, Any]) -> Any:
     res = 0
-    args = eval_lisp_args(args, ctx)
-    for arg in args:
+    for arg in eval_lisp_args(args, ctx):
         res += arg
 
     return res
