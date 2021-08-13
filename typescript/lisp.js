@@ -102,12 +102,13 @@ function parse(tokens, cursor) {
 }
 function evalLispArgs(args, ctx) {
     var evalLispledArgs = [];
-    while (args) {
-        if (args.kind !== "Pair") {
+    var currentArgNode = args;
+    while (currentArgNode) {
+        if (currentArgNode.kind !== "Pair") {
             throw new Error("Expected linked list.");
         }
-        evalLispledArgs.push(evalLisp(args.pair[0], ctx));
-        args = args.pair[1];
+        evalLispledArgs.push(evalLisp(currentArgNode.pair[0], ctx));
+        currentArgNode = currentArgNode.pair[1];
     }
     return evalLispledArgs;
 }

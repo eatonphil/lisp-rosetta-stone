@@ -146,12 +146,13 @@ function parse(tokens: Token[], cursor: number): [number, Sexp] {
 
 function evalLispArgs(args: Sexp, ctx: Map<string, any>): any[] {
   const evalLispledArgs: any[] = [];
-  while (args) {
-    if(args.kind !== "Pair") {
+  let currentArgNode: Sexp | null = args;
+  while (currentArgNode) {
+    if(currentArgNode.kind !== "Pair") {
       throw new Error("Expected linked list.");
     }
-    evalLispledArgs.push(evalLisp(args.pair[0], ctx));
-    args = args.pair[1];
+    evalLispledArgs.push(evalLisp(currentArgNode.pair[0], ctx));
+    currentArgNode = currentArgNode.pair[1];
   }
   return evalLispledArgs;
 }
