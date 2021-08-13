@@ -85,6 +85,9 @@ function parse(tokens, cursor) {
     for (var t = tokens[cursor]; cursor < tokens.length; cursor++, t = tokens[cursor]) {
         if (t.value === "(") {
             var _a = parse(tokens, cursor), newCursor = _a[0], child = _a[1];
+            if (!child) {
+                throw new Error("Expected child.");
+            }
             siblings = append(siblings, child);
             cursor = newCursor;
             continue;

@@ -125,6 +125,9 @@ function parse(tokens: Token[], cursor: number): [number, Sexp] {
   for (let t = tokens[cursor]; cursor < tokens.length; cursor++, t = tokens[cursor]) {
     if (t.value === "(") {
       const [newCursor, child] = parse(tokens, cursor);
+      if(!child) {
+        throw new Error("Expected child.");
+      }
       siblings = append(siblings, child);
       cursor = newCursor;
       continue;
