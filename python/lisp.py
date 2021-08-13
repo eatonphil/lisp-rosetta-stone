@@ -1,12 +1,13 @@
 import sys
-from enum import Enum
+from enum import auto, Enum, unique
 from typing import Any, NamedTuple, Optional, Tuple
 
 
+@unique
 class TokenKind(Enum):
-    INTEGER = 1
-    IDENTIFIER = 2
-    SYNTAX = 3
+    INTEGER = auto()
+    IDENTIFIER = auto()
+    SYNTAX = auto()
 
 
 class Token(NamedTuple):
@@ -14,9 +15,10 @@ class Token(NamedTuple):
     kind: TokenKind
 
 
+@unique
 class SexpKind(Enum):
-    ATOM = 1
-    PAIR = 2
+    ATOM = auto()
+    PAIR = auto()
 
 
 class Sexp(NamedTuple):
