@@ -1,40 +1,52 @@
 type SexpKind = 'Atom' | 'Pair';
 
-class Sexp {
-  kind: SexpKind;
+interface SexpAtom {
+  kind: 'Atom';
   atom: Token;
-  pair: [Sexp, Sexp];
-
-  constructor(kind: SexpKind, atom: Token, pair: [Sexp, Sexp]) {
-    this.kind = kind;
-    this.atom = atom;
-    this.pair = pair;
-  }
-
-  pretty(): string {
-    if (this.kind === 'Atom') {
-      return this.atom.value;
-    }
-
-    if (!this.pair[1]) {
-      return `(${this.pair[0].pretty()} . NIL)`;
-    }
-
-    return `(${this.pair[0].pretty()} . ${this.pair[1].pretty()})`;
-  }
-
-  static append(first: Sexp, second: Sexp) {
-    if (!first) {
-      return new Sexp('Pair', null, [second, null]);
-    }
-
-    if (first.kind === 'Atom') {
-      return new Sexp('Pair', null, [first, second]);
-    }
-
-    return new Sexp('Pair', null, [first.pair[0], Sexp.append(first.pair[1], second)]);
-  }
 }
+
+interface SexpPair {
+  kind: 'Pair';
+  pair: [Sexp, Sexp | null];
+}
+
+type Sexp = SexpAtom | SexpPair;
+
+function makeSexpPair(pair: [Sexp, Sexp | null]): SexpPair {
+  return { kind: 'Pair', pair };
+}
+
+function makeSexpAtom(atom: Token): SexpAtom {
+  return { kind: 'Atom', atom };
+}
+
+function pretty(sexp: Sexp): string {
+  if (sexp.kind === 'Atom') {
+    return sexp.atom.value;
+  }
+
+  if (!sexp.pair[1]) {
+    return `(${pretty(sexp.pair[0])} . NIL)`;
+  }
+
+  return `(${pretty(sexp.pair[0])} . ${pretty(sexp.pair[1])})`;
+}
+
+function append(first: Sexp | null, second: Sexp | null): Sexp {
+  if (!first) {
+    if(!second) {
+      throw new Error("Expected second.")
+    }
+    return makeSexpPair([second, null]);
+  }
+
+  if (first.kind === 'Atom') {
+    return makeSexpPair([first, second]);
+  }
+
+  return makeSexpPair([first.pair[0], append(first.pair[1], second)]);
+}
+
 
 type TokenKind = 'Integer' | 'Identifier' | 'Syntax';
 class Token {
@@ -104,8 +116,8 @@ function lex(program: string): Token[] {
   return tokens;
 }
 
-function parse(tokens: Token[], cursor: number): [number, Sexp] {
-  let siblings: Sexp = null;
+function parse(tokens: Token[], cursor: number): [number, Sexp | null] {
+  let siblings: Sexp | null = null;
 
   if (tokens[cursor].value !== "(") {
     throw new Error(`Expected opening parenthesis, got '${tokens[cursor].value}'`);
@@ -116,7 +128,10 @@ function parse(tokens: Token[], cursor: number): [number, Sexp] {
   for (let t = tokens[cursor]; cursor < tokens.length; cursor++, t = tokens[cursor]) {
     if (t.value === "(") {
       const [newCursor, child] = parse(tokens, cursor);
-      siblings = Sexp.append(siblings, child);
+      if(!child) {
+        throw new Error("Expected child.");
+      }
+      siblings = append(siblings, child);
       cursor = newCursor;
       continue;
     }
@@ -125,30 +140,43 @@ function parse(tokens: Token[], cursor: number): [number, Sexp] {
       return [cursor, siblings];
     }
 
-    const s = new Sexp('Atom', t, null);
-    siblings = Sexp.append(siblings, s);
+    const s = makeSexpAtom(t);
+    siblings = append(siblings, s);
   }
 
   return [cursor, siblings];
 }
 
-function evalLispArgs(args: Sexp, ctx: Map<string, any>): any[] {
-  const evalLispledArgs: any[] = [];
-  while (args) {
-    evalLispledArgs.push(evalLisp(args.pair[0], ctx));
-    args = args.pair[1];
+type Context = Map<string, EvalReturnType>;
+
+function evalLispArgs(args: Sexp, ctx: Context) {
+  const evalLispledArgs: EvalReturnType[] = [];
+  let currentArgNode: Sexp | null = args;
+  while (currentArgNode) {
+    if(currentArgNode.kind !== "Pair") {
+      throw new Error("Expected linked list.");
+    }
+    evalLispledArgs.push(evalLisp(currentArgNode.pair[0], ctx));
+    currentArgNode = currentArgNode.pair[1];
   }
   return evalLispledArgs;
 }
 
-function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
+type EvalReturnType = number | boolean | ((callArgs: SexpPair, callCtx: Context) => EvalReturnType);
+
+function evalLisp(ast: Sexp, ctx: Context): EvalReturnType {
   if (ast.kind === 'Pair') {
     const fn = evalLisp(ast.pair[0], ctx);
     if (!fn) {
-      throw new Error("Unknown function: " + ast.pair[0].pretty());
-      return null;
+      throw new Error("Unknown function: " + pretty(ast.pair[0]));
+    }
+    if (typeof fn != "function") {
+      throw new Error("Not a function: " + pretty(ast.pair[0]));
     }
     const args = ast.pair[1];
+    if (args?.kind !== 'Pair') {
+      throw new Error("Not a linked list: " + (args ? pretty(args) : "null"));
+    }
     return fn(args, ctx);
   }
 
@@ -156,17 +184,25 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
     return +ast.atom.value;
   }
 
-  const value = ctx[ast.atom.value];
+  const value = ctx.get(ast.atom.value);
   if (value) {
     return value;
   }
 
   const builtins = {
-    "<=": (args, _) => {
+    "<=": (args: SexpPair) => {
       const evalLispledArgs = evalLispArgs(args, ctx);
       return evalLispledArgs[0] <= evalLispledArgs[1];
     },
-    "if": (args, _) => {
+    "if": (args: SexpPair) => {
+      if (!(args.pair[1] && args.pair[1].kind === "Pair")) {
+        throw new Error("Expected a true-branch");
+      }
+
+      if (!(args.pair[1].pair[1] && args.pair[1].pair[1].kind === "Pair")) {
+        throw new Error("Expected a false-branch");
+      }
+
       const test = evalLisp(args.pair[0], ctx);
       if (test) {
 	return evalLisp(args.pair[1].pair[0], ctx);
@@ -174,79 +210,106 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
       
       return evalLisp(args.pair[1].pair[1].pair[0], ctx);
     },
-    "def": (args, _) => {
+    "def": (args: SexpPair) => {
+      if (!(args.pair[0] && args.pair[0].kind === "Atom")) {
+        throw new Error("Expected a function name.");
+      }
+
+      if (!(args.pair[1] && args.pair[1].kind === "Pair")) {
+        throw new Error("Expected a function body.");
+      }
+
       const evalLispledArg = evalLisp(args.pair[1].pair[0], ctx);
-      ctx[args.pair[0].atom.value] = evalLispledArg;
+      ctx.set(args.pair[0].atom.value, evalLispledArg);
       return evalLispledArg;
     },
-    "lambda": (args, _) => {
+    "lambda": (args: SexpPair) => {
       const params = args.pair[0];
       const body = args.pair[1];
 
-      return (callArgs, callCtx) => {
+      return (callArgs: Sexp, callCtx: Context) => {
 	const evalLispledCallArgs = evalLispArgs(callArgs, callCtx);
-	const childCallCtx = { ...callCtx };
-	let iter = params;
+	const childCallCtx = new Map(callCtx);
+	let iter: Sexp | null = params;
 	let i = 0;
 	while (iter) {
-	  childCallCtx[iter.pair[0].atom.value] = evalLispledCallArgs[i];
+    if(!(iter.kind === 'Pair' && iter.pair[0].kind === 'Atom')) {
+      throw new Error("Expected argument list.");
+    }
+	  childCallCtx.set(iter.pair[0].atom.value, evalLispledCallArgs[i]);
 	  i++;
 	  iter = iter.pair[1];
 	}
 
-	let begin = new Sexp('Atom', new Token("begin", 'Identifier'), null);
-	begin = Sexp.append(begin, body);
+	let begin: Sexp = makeSexpAtom(new Token("begin", 'Identifier'));
+	begin = append(begin, body);
 	return evalLisp(begin, childCallCtx);
       };
     },
-    "begin": (args, _) => {
+    "begin": (args: SexpPair) => {
       let res = null;
-      while (args) {
-	res = evalLisp(args.pair[0], ctx);
-	args = args.pair[1];
+      let current: Sexp | null = args;
+      while (current) {
+        if(current.kind !== 'Pair'){
+          throw new Error("Expected linked list.")
+        }
+	res = evalLisp(current.pair[0], ctx);
+	current = current.pair[1];
       }
 
-      return res;
+      // TODO: Fix non-null assertion. Valid because the `current` value is initialized to
+      // non-null, meaning the `res` value will be non-null.
+      return res!;
     },
-    "+": (args, _) => {
+    "+": (args: SexpPair) => {
       let res = 0;
       for (let arg of evalLispArgs(args, ctx)) {
+        if (typeof arg !== 'number') {
+          throw new Error("+ expects number arguments.");
+        }
 	res += arg;
       }
 
       return res;
     },
-    "-": (args, _) => {
+    "-": (args: SexpPair) => {
       const evalLispledArgs = evalLispArgs(args, ctx);
       let res = evalLispledArgs[0];
-      let rest = evalLispledArgs.slice(1);
+      if (typeof res !== 'number') {
+        throw new Error("- expects number arguments.");
+      }
+    let rest = evalLispledArgs.slice(1);
       for (let arg of rest) {
+        if (typeof arg !== 'number') {
+          throw new Error("- expects number arguments.");
+        }
 	res -= arg;
       }
       return res;
     },
   };
 
-  if (!builtins[ast.atom.value]) {
+  const key = ast.atom.value as keyof typeof builtins;
+
+  if (!builtins[key]) {
     throw new Error("Undefined value: " + ast.atom.value);
-    return null;
   }
 
-  return builtins[ast.atom.value];
+  return builtins[key];
 }
 
 function main() {
   const program = process.argv[2];
   const tokens = lex(program);
-  let begin = new Sexp('Atom', new Token("begin", 'Identifier'), null);
-  begin = Sexp.append(begin, null);
+  let begin: Sexp = makeSexpAtom(new Token("begin", 'Identifier'));
+  begin = append(begin, null);
   let [cursor, child] = parse(tokens, 0);
-  begin = Sexp.append(begin, child);
+  begin = append(begin, child);
   while (cursor !== tokens.length - 1) {
     ([cursor, child] = parse(tokens, cursor+1));
-    begin = Sexp.append(begin, child);
+    begin = append(begin, child);
   }
-  const result = evalLisp(begin, {} as Map<string, any>);
+  const result = evalLisp(begin, new Map);
   console.log(result);
 }
 

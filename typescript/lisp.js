@@ -1,40 +1,31 @@
-var __assign = (this && this.__assign) || function () {
-    __assign = Object.assign || function(t) {
-        for (var s, i = 1, n = arguments.length; i < n; i++) {
-            s = arguments[i];
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                t[p] = s[p];
-        }
-        return t;
-    };
-    return __assign.apply(this, arguments);
-};
-var Sexp = /** @class */ (function () {
-    function Sexp(kind, atom, pair) {
-        this.kind = kind;
-        this.atom = atom;
-        this.pair = pair;
+"use strict";
+function makeSexpPair(pair) {
+    return { kind: 'Pair', pair: pair };
+}
+function makeSexpAtom(atom) {
+    return { kind: 'Atom', atom: atom };
+}
+function pretty(sexp) {
+    if (sexp.kind === 'Atom') {
+        return sexp.atom.value;
     }
-    Sexp.prototype.pretty = function () {
-        if (this.kind === 'Atom') {
-            return this.atom.value;
+    if (!sexp.pair[1]) {
+        return "(" + pretty(sexp.pair[0]) + " . NIL)";
+    }
+    return "(" + pretty(sexp.pair[0]) + " . " + pretty(sexp.pair[1]) + ")";
+}
+function append(first, second) {
+    if (!first) {
+        if (!second) {
+            throw new Error("Expected second.");
         }
-        if (!this.pair[1]) {
-            return "(" + this.pair[0].pretty() + " . NIL)";
-        }
-        return "(" + this.pair[0].pretty() + " . " + this.pair[1].pretty() + ")";
-    };
-    Sexp.append = function (first, second) {
-        if (!first) {
-            return new Sexp('Pair', null, [second, null]);
-        }
-        if (first.kind === 'Atom') {
-            return new Sexp('Pair', null, [first, second]);
-        }
-        return new Sexp('Pair', null, [first.pair[0], Sexp.append(first.pair[1], second)]);
-    };
-    return Sexp;
-}());
+        return makeSexpPair([second, null]);
+    }
+    if (first.kind === 'Atom') {
+        return makeSexpPair([first, second]);
+    }
+    return makeSexpPair([first.pair[0], append(first.pair[1], second)]);
+}
 var Token = /** @class */ (function () {
     function Token(value, kind) {
         this.value = value;
@@ -98,23 +89,30 @@ function parse(tokens, cursor) {
     for (var t = tokens[cursor]; cursor < tokens.length; cursor++, t = tokens[cursor]) {
         if (t.value === "(") {
             var _a = parse(tokens, cursor), newCursor = _a[0], child = _a[1];
-            siblings = Sexp.append(siblings, child);
+            if (!child) {
+                throw new Error("Expected child.");
+            }
+            siblings = append(siblings, child);
             cursor = newCursor;
             continue;
         }
         if (t.value === ")") {
             return [cursor, siblings];
         }
-        var s = new Sexp('Atom', t, null);
-        siblings = Sexp.append(siblings, s);
+        var s = makeSexpAtom(t);
+        siblings = append(siblings, s);
     }
     return [cursor, siblings];
 }
 function evalLispArgs(args, ctx) {
     var evalLispledArgs = [];
-    while (args) {
-        evalLispledArgs.push(evalLisp(args.pair[0], ctx));
-        args = args.pair[1];
+    var currentArgNode = args;
+    while (currentArgNode) {
+        if (currentArgNode.kind !== "Pair") {
+            throw new Error("Expected linked list.");
+        }
+        evalLispledArgs.push(evalLisp(currentArgNode.pair[0], ctx));
+        currentArgNode = currentArgNode.pair[1];
     }
     return evalLispledArgs;
 }
@@ -122,100 +120,135 @@ function evalLisp(ast, ctx) {
     if (ast.kind === 'Pair') {
         var fn = evalLisp(ast.pair[0], ctx);
         if (!fn) {
-            throw new Error("Unknown function: " + ast.pair[0].pretty());
-            return null;
+            throw new Error("Unknown function: " + pretty(ast.pair[0]));
+        }
+        if (typeof fn != "function") {
+            throw new Error("Not a function: " + pretty(ast.pair[0]));
         }
         var args = ast.pair[1];
+        if ((args === null || args === void 0 ? void 0 : args.kind) !== 'Pair') {
+            throw new Error("Not a linked list: " + (args ? pretty(args) : "null"));
+        }
         return fn(args, ctx);
     }
     if (ast.atom.kind === 'Integer') {
         return +ast.atom.value;
     }
-    var value = ctx[ast.atom.value];
+    var value = ctx.get(ast.atom.value);
     if (value) {
         return value;
     }
     var builtins = {
-        "<=": function (args, _) {
+        "<=": function (args) {
             var evalLispledArgs = evalLispArgs(args, ctx);
             return evalLispledArgs[0] <= evalLispledArgs[1];
         },
-        "if": function (args, _) {
+        "if": function (args) {
+            if (!(args.pair[1] && args.pair[1].kind === "Pair")) {
+                throw new Error("Expected a true-branch");
+            }
+            if (!(args.pair[1].pair[1] && args.pair[1].pair[1].kind === "Pair")) {
+                throw new Error("Expected a false-branch");
+            }
             var test = evalLisp(args.pair[0], ctx);
             if (test) {
                 return evalLisp(args.pair[1].pair[0], ctx);
             }
             return evalLisp(args.pair[1].pair[1].pair[0], ctx);
         },
-        "def": function (args, _) {
+        "def": function (args) {
+            if (!(args.pair[0] && args.pair[0].kind === "Atom")) {
+                throw new Error("Expected a function name.");
+            }
+            if (!(args.pair[1] && args.pair[1].kind === "Pair")) {
+                throw new Error("Expected a function body.");
+            }
             var evalLispledArg = evalLisp(args.pair[1].pair[0], ctx);
-            ctx[args.pair[0].atom.value] = evalLispledArg;
+            ctx.set(args.pair[0].atom.value, evalLispledArg);
             return evalLispledArg;
         },
-        "lambda": function (args, _) {
+        "lambda": function (args) {
             var params = args.pair[0];
             var body = args.pair[1];
             return function (callArgs, callCtx) {
                 var evalLispledCallArgs = evalLispArgs(callArgs, callCtx);
-                var childCallCtx = __assign({}, callCtx);
+                var childCallCtx = new Map(callCtx);
                 var iter = params;
                 var i = 0;
                 while (iter) {
-                    childCallCtx[iter.pair[0].atom.value] = evalLispledCallArgs[i];
+                    if (!(iter.kind === 'Pair' && iter.pair[0].kind === 'Atom')) {
+                        throw new Error("Expected argument list.");
+                    }
+                    childCallCtx.set(iter.pair[0].atom.value, evalLispledCallArgs[i]);
                     i++;
                     iter = iter.pair[1];
                 }
-                var begin = new Sexp('Atom', new Token("begin", 'Identifier'), null);
-                begin = Sexp.append(begin, body);
+                var begin = makeSexpAtom(new Token("begin", 'Identifier'));
+                begin = append(begin, body);
                 return evalLisp(begin, childCallCtx);
             };
         },
-        "begin": function (args, _) {
+        "begin": function (args) {
             var res = null;
-            while (args) {
-                res = evalLisp(args.pair[0], ctx);
-                args = args.pair[1];
+            var current = args;
+            while (current) {
+                if (current.kind !== 'Pair') {
+                    throw new Error("Expected linked list.");
+                }
+                res = evalLisp(current.pair[0], ctx);
+                current = current.pair[1];
             }
+            // TODO: Fix non-null assertion. Valid because the `current` value is initialized to
+            // non-null, meaning the `res` value will be non-null.
             return res;
         },
-        "+": function (args, _) {
+        "+": function (args) {
             var res = 0;
             for (var _i = 0, _a = evalLispArgs(args, ctx); _i < _a.length; _i++) {
                 var arg = _a[_i];
+                if (typeof arg !== 'number') {
+                    throw new Error("+ expects number arguments.");
+                }
                 res += arg;
             }
             return res;
         },
-        "-": function (args, _) {
+        "-": function (args) {
             var evalLispledArgs = evalLispArgs(args, ctx);
             var res = evalLispledArgs[0];
+            if (typeof res !== 'number') {
+                throw new Error("- expects number arguments.");
+            }
             var rest = evalLispledArgs.slice(1);
             for (var _i = 0, rest_1 = rest; _i < rest_1.length; _i++) {
                 var arg = rest_1[_i];
+                if (typeof arg !== 'number') {
+                    throw new Error("- expects number arguments.");
+                }
                 res -= arg;
             }
             return res;
-        }
+        },
     };
-    if (!builtins[ast.atom.value]) {
+    var key = ast.atom.value;
+    if (!builtins[key]) {
         throw new Error("Undefined value: " + ast.atom.value);
-        return null;
     }
-    return builtins[ast.atom.value];
+    return builtins[key];
 }
 function main() {
     var _a;
     var program = process.argv[2];
     var tokens = lex(program);
-    var begin = new Sexp('Atom', new Token("begin", 'Identifier'), null);
-    begin = Sexp.append(begin, null);
+    var begin = makeSexpAtom(new Token("begin", 'Identifier'));
+    begin = append(begin, null);
     var _b = parse(tokens, 0), cursor = _b[0], child = _b[1];
-    begin = Sexp.append(begin, child);
+    begin = append(begin, child);
     while (cursor !== tokens.length - 1) {
         (_a = parse(tokens, cursor + 1), cursor = _a[0], child = _a[1]);
-        begin = Sexp.append(begin, child);
+        begin = append(begin, child);
     }
-    var result = evalLisp(begin, {});
+    var result = evalLisp(begin, new Map);
     console.log(result);
 }
 main();
