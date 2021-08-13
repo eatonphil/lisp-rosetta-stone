@@ -1,13 +1,19 @@
 type SexpKind = 'Atom' | 'Pair';
 
-interface Sexp {
-  kind: SexpKind;
+interface SexpAtom {
+  kind: 'Atom';
   atom: Token;
+}
+
+interface SexpPair {
+  kind: 'Pair';
   pair: [Sexp, Sexp];
 }
 
+type Sexp = SexpAtom | SexpPair;
+
 function makeSexp(kind: SexpKind, atom: Token, pair: [Sexp, Sexp]): Sexp {
-  return { kind, atom, pair };
+  return kind === 'Atom' ? { kind, atom } :  { kind, pair };
 }
 
 function pretty(sexp: Sexp): string {
@@ -134,6 +140,9 @@ function parse(tokens: Token[], cursor: number): [number, Sexp] {
 function evalLispArgs(args: Sexp, ctx: Map<string, any>): any[] {
   const evalLispledArgs: any[] = [];
   while (args) {
+    if(args.kind !== "Pair") {
+      throw new Error("Expected linked list.");
+    }
     evalLispledArgs.push(evalLisp(args.pair[0], ctx));
     args = args.pair[1];
   }

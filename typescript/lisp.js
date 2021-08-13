@@ -1,5 +1,5 @@
 function makeSexp(kind, atom, pair) {
-    return { kind: kind, atom: atom, pair: pair };
+    return kind === 'Atom' ? { kind: kind, atom: atom } : { kind: kind, pair: pair };
 }
 function pretty(sexp) {
     if (sexp.kind === 'Atom') {
@@ -97,6 +97,9 @@ function parse(tokens, cursor) {
 function evalLispArgs(args, ctx) {
     var evalLispledArgs = [];
     while (args) {
+        if (args.kind !== "Pair") {
+            throw new Error("Expected linked list.");
+        }
         evalLispledArgs.push(evalLisp(args.pair[0], ctx));
         args = args.pair[1];
     }
