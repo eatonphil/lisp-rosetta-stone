@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import Any, Optional, Tuple
+from typing import Any, NamedTuple, Optional, Tuple
 
 
 class TokenKind(Enum):
@@ -9,13 +9,9 @@ class TokenKind(Enum):
     SYNTAX = 3
 
 
-class Token():
+class Token(NamedTuple):
     value: str
     kind: TokenKind
-
-    def __init__(self, value, kind):
-        self.value = value
-        self.kind = kind
 
 
 class SexpKind(Enum):
@@ -23,18 +19,14 @@ class SexpKind(Enum):
     PAIR = 2
 
 
-class Sexp():
+class Sexp(NamedTuple):
     kind: SexpKind
-    atom: Token
-    pair: Tuple['Sexp', 'Sexp']
-
-    def __init__(self, kind, atom, pair):
-        self.kind = kind
-        self.atom = atom
-        self.pair = pair
+    atom: Optional[Token]
+    pair: Tuple
 
     def pretty(self) -> str:
         if self.kind == SexpKind.ATOM:
+            assert self.atom is not None
             return self.atom.value
 
         if self.pair[1] is None:
@@ -45,13 +37,14 @@ class Sexp():
 
 def sexp_append(first: Optional[Sexp], second: Optional[Sexp]) -> Sexp:
     if first is None:
-        return Sexp(SexpKind.PAIR, None, [second, None])
+        assert second is not None
+        return Sexp(SexpKind.PAIR, None, (second, None))
 
     if first.kind == SexpKind.ATOM:
-        return Sexp(SexpKind.PAIR, None, [first, second])
+        return Sexp(SexpKind.PAIR, None, (first, second))
 
     appended = sexp_append(first.pair[1], second)
-    return Sexp(SexpKind.PAIR, None, [first.pair[0], appended])
+    return Sexp(SexpKind.PAIR, None, (first.pair[0], appended))
 
 
 def lex_integer(program: str, cursor: int) -> Tuple[int, Token]:
@@ -128,7 +121,7 @@ def parse(tokens: list[Token], cursor: int) -> Tuple[int, Optional[Sexp]]:
         if t.value == ")":
             return cursor, siblings
 
-        s = Sexp(SexpKind.ATOM, t, None)
+        s = Sexp(SexpKind.ATOM, t, (None, None))
         siblings = sexp_append(siblings, s)
         cursor += 1
 
@@ -180,7 +173,7 @@ def builtin_lambda(args: Sexp, _) -> Any:
             i += 1
             it = it.pair[1]
 
-        begin = Sexp(SexpKind.ATOM, Token("begin", TokenKind.IDENTIFIER), None)
+        begin = Sexp(SexpKind.ATOM, Token("begin", TokenKind.IDENTIFIER), (None, None))
         begin = sexp_append(begin, body)
         return eval_lisp(begin, child_call_ctx)
 
@@ -232,6 +225,7 @@ def eval_lisp(ast: Sexp, ctx: dict[str, Any]) -> Any:
 
         return fn(ast.pair[1], ctx)
 
+    assert ast.atom is not None
     if ast.atom.kind == TokenKind.INTEGER:
         return int(ast.atom.value)
 
@@ -248,7 +242,7 @@ def main():
     program = sys.argv[1]
     tokens = lex(program)
 
-    begin = Sexp(SexpKind.ATOM, Token("begin", TokenKind.IDENTIFIER), None)
+    begin = Sexp(SexpKind.ATOM, Token("begin", TokenKind.IDENTIFIER), (None, None))
     begin = sexp_append(begin, None)
 
     cursor = -1
