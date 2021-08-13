@@ -36,17 +36,20 @@ class Sexp(NamedTuple):
 
         return f'({self.pair[0]!s} . {self.pair[1]!s})'
 
+    @staticmethod
+    def create_pair(head, tail):
+        return Sexp(SexpKind.PAIR, None, (head, tail))
 
 def sexp_append(first: Optional[Sexp], second: Optional[Sexp]) -> Sexp:
     if first is None:
         assert second is not None
-        return Sexp(SexpKind.PAIR, None, (second, None))
+        return Sexp.create_pair(second, None)
 
     if first.kind == SexpKind.ATOM:
-        return Sexp(SexpKind.PAIR, None, (first, second))
+        return Sexp.create_pair(first, second)
 
     appended = sexp_append(first.pair[1], second)
-    return Sexp(SexpKind.PAIR, None, (first.pair[0], appended))
+    return Sexp.create_pair(first.pair[0], appended)
 
 
 def lex_integer(program: str, cursor: int) -> Tuple[int, Token]:
