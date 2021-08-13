@@ -96,7 +96,7 @@ def lex(program: str) -> list[Token]:
             tokens.append(token)
             break
         else:
-            raise Exception(f"Unknown token near '{program[i:]}' at index '{i}'")
+            raise SyntaxError(f"Unknown token near '{program[i:]}' at index '{i}'")
 
     return tokens
 
@@ -105,7 +105,7 @@ def parse(tokens: list[Token], cursor: int) -> Tuple[int, Optional[Sexp]]:
     siblings = None
 
     if tokens[cursor].value != "(":
-        raise Exception("Expected opening parenthesis, got: " + tokens[cursor].value)
+        raise ValueError("Expected opening parenthesis, got: " + tokens[cursor].value)
 
     cursor += 1
 
@@ -220,7 +220,7 @@ def eval_lisp(ast: Sexp, ctx: dict[str, Any]) -> Any:
     if ast.kind == SexpKind.PAIR:
         fn = eval_lisp(ast.pair[0], ctx)
         if not fn:
-            raise Exception("Unknown def: " + ast.pair[0].pretty())
+            raise LookupError("Unknown def: " + ast.pair[0].pretty())
 
         return fn(ast.pair[1], ctx)
 
@@ -232,7 +232,7 @@ def eval_lisp(ast: Sexp, ctx: dict[str, Any]) -> Any:
         return ctx[ast.atom.value]
 
     if ast.atom.value not in BUILTINS:
-        raise Exception("Undefined value :" + ast.atom.value)
+        raise LookupError("Undefined value :" + ast.atom.value)
 
     return BUILTINS[ast.atom.value]
 
