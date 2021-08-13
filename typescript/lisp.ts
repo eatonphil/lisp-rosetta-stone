@@ -167,7 +167,6 @@ function evalLisp(ast: Sexp, ctx: Context): any {
     const fn = evalLisp(ast.pair[0], ctx);
     if (!fn) {
       throw new Error("Unknown function: " + pretty(ast.pair[0]));
-      return null;
     }
     const args = ast.pair[1];
     return fn(args, ctx);
