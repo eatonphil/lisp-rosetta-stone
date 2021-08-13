@@ -189,20 +189,13 @@ def builtin_begin(args: Sexp, ctx: dict[str, Any]) -> Any:
 
 
 def builtin_plus(args: Sexp, ctx: dict[str, Any]) -> Any:
-    res = 0
-    for arg in eval_lisp_args(args, ctx):
-        res += arg
-
-    return res
+    return sum(eval_lisp_args(args, ctx))
 
 
 def builtin_minus(args: Sexp, ctx: dict[str, Any]) -> Any:
     evalled_args = eval_lisp_args(args, ctx)
-    res = evalled_args[0]
-    rest = evalled_args[1:]
-    for arg in rest:
-        res -= arg
-    return res
+    evalled_args[0] *= -1
+    return -sum(evalled_args)
 
 
 BUILTINS = {
