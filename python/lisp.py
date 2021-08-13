@@ -40,6 +40,10 @@ class Sexp(NamedTuple):
     def create_pair(head, tail):
         return Sexp(SexpKind.PAIR, None, (head, tail))
 
+    @staticmethod
+    def create_atom(token):
+        return Sexp(SexpKind.ATOM, token, (None, None))
+
 def sexp_append(first: Optional[Sexp], second: Optional[Sexp]) -> Sexp:
     if first is None:
         assert second is not None
@@ -122,7 +126,7 @@ def parse(tokens: list[Token], cursor: int) -> Tuple[int, Optional[Sexp]]:
         if t.value == ")":
             return cursor, siblings
 
-        s = Sexp(SexpKind.ATOM, t, (None, None))
+        s = Sexp.create_atom(t)
         siblings = sexp_append(siblings, s)
         cursor += 1
 
@@ -172,7 +176,7 @@ def builtin_lambda(args: Sexp, _) -> Any:
             i += 1
             it = it.pair[1]
 
-        begin = Sexp(SexpKind.ATOM, Token("begin", TokenKind.IDENTIFIER), (None, None))
+        begin = Sexp.create_atom(Token("begin", TokenKind.IDENTIFIER))
         begin = sexp_append(begin, body)
         return eval_lisp(begin, child_call_ctx)
 
@@ -234,7 +238,7 @@ def main():
     program = sys.argv[1]
     tokens = lex(program)
 
-    begin = Sexp(SexpKind.ATOM, Token("begin", TokenKind.IDENTIFIER), (None, None))
+    begin = Sexp.create_atom(Token("begin", TokenKind.IDENTIFIER))
     begin = sexp_append(begin, None)
 
     cursor = -1
