@@ -26,15 +26,15 @@ class Sexp(NamedTuple):
     atom: Optional[Token]
     pair: Tuple
 
-    def pretty(self) -> str:
+    def __str__(self) -> str:
         if self.kind == SexpKind.ATOM:
             assert self.atom is not None
             return self.atom.value
 
         if self.pair[1] is None:
-            return f'({self.pair[0].pretty()} . NIL)'
+            return f'({self.pair[0]!s} . NIL)'
 
-        return f'({self.pair[0].pretty()} . {self.pair[1].pretty()})'
+        return f'({self.pair[0]!s} . {self.pair[1]!s})'
 
 
 def sexp_append(first: Optional[Sexp], second: Optional[Sexp]) -> Sexp:
@@ -220,7 +220,7 @@ def eval_lisp(ast: Sexp, ctx: dict[str, Any]) -> Any:
     if ast.kind == SexpKind.PAIR:
         fn = eval_lisp(ast.pair[0], ctx)
         if not fn:
-            raise LookupError("Unknown def: " + ast.pair[0].pretty())
+            raise LookupError(f"Unknown def: {ast.pair[0]!s}")
 
         return fn(ast.pair[1], ctx)
 
@@ -232,7 +232,7 @@ def eval_lisp(ast: Sexp, ctx: dict[str, Any]) -> Any:
         return ctx[ast.atom.value]
 
     if ast.atom.value not in BUILTINS:
-        raise LookupError("Undefined value :" + ast.atom.value)
+        raise LookupError("Undefined value: " + ast.atom.value)
 
     return BUILTINS[ast.atom.value]
 
