@@ -1,29 +1,24 @@
-var Sexp = /** @class */ (function () {
-    function Sexp(kind, atom, pair) {
-        this.kind = kind;
-        this.atom = atom;
-        this.pair = pair;
+function makeSexp(kind, atom, pair) {
+    return { kind: kind, atom: atom, pair: pair };
+}
+function pretty(sexp) {
+    if (sexp.kind === 'Atom') {
+        return sexp.atom.value;
     }
-    Sexp.prototype.pretty = function () {
-        if (this.kind === 'Atom') {
-            return this.atom.value;
-        }
-        if (!this.pair[1]) {
-            return "(" + this.pair[0].pretty() + " . NIL)";
-        }
-        return "(" + this.pair[0].pretty() + " . " + this.pair[1].pretty() + ")";
-    };
-    Sexp.append = function (first, second) {
-        if (!first) {
-            return new Sexp('Pair', null, [second, null]);
-        }
-        if (first.kind === 'Atom') {
-            return new Sexp('Pair', null, [first, second]);
-        }
-        return new Sexp('Pair', null, [first.pair[0], Sexp.append(first.pair[1], second)]);
-    };
-    return Sexp;
-}());
+    if (!sexp.pair[1]) {
+        return "(" + pretty(sexp.pair[0]) + " . NIL)";
+    }
+    return "(" + pretty(sexp.pair[0]) + " . " + pretty(sexp.pair[1]) + ")";
+}
+function append(first, second) {
+    if (!first) {
+        return makeSexp('Pair', null, [second, null]);
+    }
+    if (first.kind === 'Atom') {
+        return makeSexp('Pair', null, [first, second]);
+    }
+    return makeSexp('Pair', null, [first.pair[0], append(first.pair[1], second)]);
+}
 var Token = /** @class */ (function () {
     function Token(value, kind) {
         this.value = value;
@@ -87,15 +82,15 @@ function parse(tokens, cursor) {
     for (var t = tokens[cursor]; cursor < tokens.length; cursor++, t = tokens[cursor]) {
         if (t.value === "(") {
             var _a = parse(tokens, cursor), newCursor = _a[0], child = _a[1];
-            siblings = Sexp.append(siblings, child);
+            siblings = append(siblings, child);
             cursor = newCursor;
             continue;
         }
         if (t.value === ")") {
             return [cursor, siblings];
         }
-        var s = new Sexp('Atom', t, null);
-        siblings = Sexp.append(siblings, s);
+        var s = makeSexp('Atom', t, null);
+        siblings = append(siblings, s);
     }
     return [cursor, siblings];
 }
@@ -111,7 +106,7 @@ function evalLisp(ast, ctx) {
     if (ast.kind === 'Pair') {
         var fn = evalLisp(ast.pair[0], ctx);
         if (!fn) {
-            throw new Error("Unknown function: " + ast.pair[0].pretty());
+            throw new Error("Unknown function: " + pretty(ast.pair[0]));
             return null;
         }
         var args = ast.pair[1];
@@ -154,8 +149,8 @@ function evalLisp(ast, ctx) {
                     i++;
                     iter = iter.pair[1];
                 }
-                var begin = new Sexp('Atom', new Token("begin", 'Identifier'), null);
-                begin = Sexp.append(begin, body);
+                var begin = makeSexp('Atom', new Token("begin", 'Identifier'), null);
+                begin = append(begin, body);
                 return evalLisp(begin, childCallCtx);
             };
         },
@@ -197,13 +192,13 @@ function main() {
     var _a;
     var program = process.argv[2];
     var tokens = lex(program);
-    var begin = new Sexp('Atom', new Token("begin", 'Identifier'), null);
-    begin = Sexp.append(begin, null);
+    var begin = makeSexp('Atom', new Token("begin", 'Identifier'), null);
+    begin = append(begin, null);
     var _b = parse(tokens, 0), cursor = _b[0], child = _b[1];
-    begin = Sexp.append(begin, child);
+    begin = append(begin, child);
     while (cursor !== tokens.length - 1) {
         (_a = parse(tokens, cursor + 1), cursor = _a[0], child = _a[1]);
-        begin = Sexp.append(begin, child);
+        begin = append(begin, child);
     }
     var result = evalLisp(begin, new Map);
     console.log(result);
