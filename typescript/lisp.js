@@ -15,6 +15,9 @@ function pretty(sexp) {
 }
 function append(first, second) {
     if (!first) {
+        if (!second) {
+            throw new Error("Expected second.");
+        }
         return makeSexpPair([second, null]);
     }
     if (first.kind === 'Atom') {

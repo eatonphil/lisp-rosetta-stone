@@ -7,12 +7,12 @@ interface SexpAtom {
 
 interface SexpPair {
   kind: 'Pair';
-  pair: [Sexp, Sexp];
+  pair: [Sexp, Sexp | null];
 }
 
 type Sexp = SexpAtom | SexpPair;
 
-function makeSexpPair(pair: [Sexp, Sexp]): SexpPair {
+function makeSexpPair(pair: [Sexp, Sexp | null]): SexpPair {
   return { kind: 'Pair', pair };
 }
 
@@ -32,8 +32,11 @@ function pretty(sexp: Sexp): string {
   return `(${pretty(sexp.pair[0])} . ${pretty(sexp.pair[1])})`;
 }
 
-function append(first: Sexp, second: Sexp): Sexp {
+function append(first: Sexp | null, second: Sexp | null): Sexp {
   if (!first) {
+    if(!second) {
+      throw new Error("Expected second.")
+    }
     return makeSexpPair([second, null]);
   }
 
@@ -113,8 +116,8 @@ function lex(program: string): Token[] {
   return tokens;
 }
 
-function parse(tokens: Token[], cursor: number): [number, Sexp] {
-  let siblings: Sexp = null;
+function parse(tokens: Token[], cursor: number): [number, Sexp | null] {
+  let siblings: Sexp | null = null;
 
   if (tokens[cursor].value !== "(") {
     throw new Error(`Expected opening parenthesis, got '${tokens[cursor].value}'`);
