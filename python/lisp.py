@@ -86,8 +86,7 @@ def lex(program: str) -> list[Token]:
             i += 1
             continue
 
-        lexers = [lex_integer, lex_identifier]
-        for lexer in lexers:
+        for lexer in [lex_integer, lex_identifier]:
             new_cursor, token = lexer(program, i)
             if new_cursor == i:
                 continue
