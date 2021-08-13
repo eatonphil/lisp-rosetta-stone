@@ -44,6 +44,7 @@ class Sexp(NamedTuple):
     def create_atom(token):
         return Sexp(SexpKind.ATOM, token, (None, None))
 
+
 def sexp_append(first: Optional[Sexp], second: Optional[Sexp]) -> Sexp:
     if first is None:
         assert second is not None
@@ -70,9 +71,9 @@ def lex_identifier(program: str, cursor: int) -> Tuple[int, Token]:
     c = program[cursor]
     end = cursor
     while ('a' <= c <= 'z') or \
-          ('A' <= c <= 'Z') or \
-          c in '+-*&$%<=' or \
-          (end > cursor and '0' <= c <= '9'):
+            ('A' <= c <= 'Z') or \
+            c in '+-*&$%<=' or \
+            (end > cursor and '0' <= c <= '9'):
         end += 1
         c = program[end]
 
@@ -102,7 +103,9 @@ def lex(program: str) -> list[Token]:
             tokens.append(token)
             break
         else:
-            raise SyntaxError(f"Unknown token near '{program[i:]}' at index '{i}'")
+            raise SyntaxError(
+                f"Unknown token near '{program[i:]}' at index '{i}'"
+            )
 
     return tokens
 
@@ -111,7 +114,9 @@ def parse(tokens: list[Token], cursor: int) -> Tuple[int, Optional[Sexp]]:
     siblings = None
 
     if tokens[cursor].value != "(":
-        raise ValueError("Expected opening parenthesis, got: " + tokens[cursor].value)
+        raise ValueError(
+            "Expected opening parenthesis, got: " + tokens[cursor].value
+        )
 
     cursor += 1
 
