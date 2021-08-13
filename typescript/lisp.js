@@ -139,6 +139,12 @@ function evalLisp(ast, ctx) {
             return evalLispledArgs[0] <= evalLispledArgs[1];
         },
         "if": function (args) {
+            if (!(args.pair[1] && args.pair[1].kind === "Pair")) {
+                throw new Error("Expected a true-branch");
+            }
+            if (!(args.pair[1].pair[1] && args.pair[1].pair[1].kind === "Pair")) {
+                throw new Error("Expected a false-branch");
+            }
             var test = evalLisp(args.pair[0], ctx);
             if (test) {
                 return evalLisp(args.pair[1].pair[0], ctx);
@@ -146,6 +152,12 @@ function evalLisp(ast, ctx) {
             return evalLisp(args.pair[1].pair[1].pair[0], ctx);
         },
         "def": function (args) {
+            if (!(args.pair[0] && args.pair[0].kind === "Atom")) {
+                throw new Error("Expected a function name.");
+            }
+            if (!(args.pair[1] && args.pair[1].kind === "Pair")) {
+                throw new Error("Expected a function body.");
+            }
             var evalLispledArg = evalLisp(args.pair[1].pair[0], ctx);
             ctx.set(args.pair[0].atom.value, evalLispledArg);
             return evalLispledArg;
@@ -159,6 +171,9 @@ function evalLisp(ast, ctx) {
                 var iter = params;
                 var i = 0;
                 while (iter) {
+                    if (!(iter.kind === 'Pair' && iter.pair[0].kind === 'Atom')) {
+                        throw new Error("Expected argument list.");
+                    }
                     childCallCtx.set(iter.pair[0].atom.value, evalLispledCallArgs[i]);
                     i++;
                     iter = iter.pair[1];
@@ -172,6 +187,9 @@ function evalLisp(ast, ctx) {
             var res = null;
             var current = args;
             while (current) {
+                if (current.kind !== 'Pair') {
+                    throw new Error("Expected linked list.");
+                }
                 res = evalLisp(current.pair[0], ctx);
                 current = current.pair[1];
             }

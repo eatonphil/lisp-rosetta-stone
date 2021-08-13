@@ -150,7 +150,7 @@ function parse(tokens: Token[], cursor: number): [number, Sexp | null] {
 type Context = Map<string, any>;
 
 function evalLispArgs(args: Sexp, ctx: Context): any[] {
-  const evalLispledArgs: any[] = [];
+  const evalLispledArgs: SexpPair[] = [];
   let currentArgNode: Sexp | null = args;
   while (currentArgNode) {
     if(currentArgNode.kind !== "Pair") {
@@ -183,11 +183,19 @@ function evalLisp(ast: Sexp, ctx: Context): any {
   }
 
   const builtins = {
-    "<=": (args: any) => {
+    "<=": (args: SexpPair) => {
       const evalLispledArgs = evalLispArgs(args, ctx);
       return evalLispledArgs[0] <= evalLispledArgs[1];
     },
-    "if": (args: any) => {
+    "if": (args: SexpPair) => {
+      if (!(args.pair[1] && args.pair[1].kind === "Pair")) {
+        throw new Error("Expected a true-branch");
+      }
+
+      if (!(args.pair[1].pair[1] && args.pair[1].pair[1].kind === "Pair")) {
+        throw new Error("Expected a false-branch");
+      }
+
       const test = evalLisp(args.pair[0], ctx);
       if (test) {
 	return evalLisp(args.pair[1].pair[0], ctx);
@@ -195,21 +203,32 @@ function evalLisp(ast: Sexp, ctx: Context): any {
       
       return evalLisp(args.pair[1].pair[1].pair[0], ctx);
     },
-    "def": (args: any) => {
+    "def": (args: SexpPair) => {
+      if (!(args.pair[0] && args.pair[0].kind === "Atom")) {
+        throw new Error("Expected a function name.");
+      }
+
+      if (!(args.pair[1] && args.pair[1].kind === "Pair")) {
+        throw new Error("Expected a function body.");
+      }
+
       const evalLispledArg = evalLisp(args.pair[1].pair[0], ctx);
       ctx.set(args.pair[0].atom.value, evalLispledArg);
       return evalLispledArg;
     },
-    "lambda": (args: any) => {
+    "lambda": (args: SexpPair) => {
       const params = args.pair[0];
       const body = args.pair[1];
 
       return (callArgs: Sexp, callCtx: Context) => {
 	const evalLispledCallArgs = evalLispArgs(callArgs, callCtx);
 	const childCallCtx = new Map(callCtx);
-	let iter = params;
+	let iter: Sexp | null = params;
 	let i = 0;
 	while (iter) {
+    if(!(iter.kind === 'Pair' && iter.pair[0].kind === 'Atom')) {
+      throw new Error("Expected argument list.");
+    }
 	  childCallCtx.set(iter.pair[0].atom.value, evalLispledCallArgs[i]);
 	  i++;
 	  iter = iter.pair[1];
@@ -220,17 +239,20 @@ function evalLisp(ast: Sexp, ctx: Context): any {
 	return evalLisp(begin, childCallCtx);
       };
     },
-    "begin": (args: any) => {
+    "begin": (args: SexpPair) => {
       let res = null;
-      let current = args;
+      let current: Sexp | null = args;
       while (current) {
+        if(current.kind !== 'Pair'){
+          throw new Error("Expected linked list.")
+        }
 	res = evalLisp(current.pair[0], ctx);
 	current = current.pair[1];
       }
 
       return res;
     },
-    "+": (args: any) => {
+    "+": (args: SexpPair) => {
       let res = 0;
       for (let arg of evalLispArgs(args, ctx)) {
 	res += arg;
@@ -238,7 +260,7 @@ function evalLisp(ast: Sexp, ctx: Context): any {
 
       return res;
     },
-    "-": (args: any) => {
+    "-": (args: SexpPair) => {
       const evalLispledArgs = evalLispArgs(args, ctx);
       let res = evalLispledArgs[0];
       let rest = evalLispledArgs.slice(1);
