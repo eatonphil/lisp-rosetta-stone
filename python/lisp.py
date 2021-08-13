@@ -50,7 +50,7 @@ def sexp_append(first: Optional[Sexp], second: Optional[Sexp]) -> Sexp:
 def lex_integer(program: str, cursor: int) -> Tuple[int, Token]:
     c = program[cursor]
     end = cursor
-    while c >= '0' and c <= '9':
+    while '0' <= c <= '9':
         end += 1
         c = program[end]
 
@@ -60,10 +60,10 @@ def lex_integer(program: str, cursor: int) -> Tuple[int, Token]:
 def lex_identifier(program: str, cursor: int) -> Tuple[int, Token]:
     c = program[cursor]
     end = cursor
-    while (c >= 'a' and c <= 'z') or \
-          (c >= 'A' and c <= 'Z') or \
-          c in ['+', '-', '*', '&', '$', '%', '<', '='] or \
-          (end > cursor and c >= '0' and c <= '9'):
+    while ('a' <= c <= 'z') or \
+          ('A' <= c <= 'Z') or \
+          c in '+-*&$%<=' or \
+          (end > cursor and '0' <= c <= '9'):
         end += 1
         c = program[end]
 
@@ -75,11 +75,11 @@ def lex(program: str) -> list[Token]:
     i = 0
     while i < len(program):
         c = program[i]
-        if c == ' ' or c == '\n' or c == '\t' or c == '\r':
+        if c in ' \n\t\r':
             i += 1
             continue
 
-        if c == ')' or c == '(':
+        if c in '()':
             tokens.append(Token(c, TokenKind.SYNTAX))
             i += 1
             continue
