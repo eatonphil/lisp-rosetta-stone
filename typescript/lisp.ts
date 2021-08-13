@@ -183,11 +183,11 @@ function evalLisp(ast: Sexp, ctx: Context): any {
   }
 
   const builtins = {
-    "<=": (args:any , _:any) => {
+    "<=": (args: any) => {
       const evalLispledArgs = evalLispArgs(args, ctx);
       return evalLispledArgs[0] <= evalLispledArgs[1];
     },
-    "if": (args:any , _:any) => {
+    "if": (args: any) => {
       const test = evalLisp(args.pair[0], ctx);
       if (test) {
 	return evalLisp(args.pair[1].pair[0], ctx);
@@ -195,12 +195,12 @@ function evalLisp(ast: Sexp, ctx: Context): any {
       
       return evalLisp(args.pair[1].pair[1].pair[0], ctx);
     },
-    "def": (args: any, _: any) => {
+    "def": (args: any) => {
       const evalLispledArg = evalLisp(args.pair[1].pair[0], ctx);
       ctx.set(args.pair[0].atom.value, evalLispledArg);
       return evalLispledArg;
     },
-    "lambda": (args: any, _: any) => {
+    "lambda": (args: any) => {
       const params = args.pair[0];
       const body = args.pair[1];
 
@@ -220,7 +220,7 @@ function evalLisp(ast: Sexp, ctx: Context): any {
 	return evalLisp(begin, childCallCtx);
       };
     },
-    "begin": (args: any, _: any) => {
+    "begin": (args: any) => {
       let res = null;
       while (args) {
 	res = evalLisp(args.pair[0], ctx);
@@ -229,7 +229,7 @@ function evalLisp(ast: Sexp, ctx: Context): any {
 
       return res;
     },
-    "+": (args: any, _: any) => {
+    "+": (args: any) => {
       let res = 0;
       for (let arg of evalLispArgs(args, ctx)) {
 	res += arg;
@@ -237,7 +237,7 @@ function evalLisp(ast: Sexp, ctx: Context): any {
 
       return res;
     },
-    "-": (args: any, _: any) => {
+    "-": (args: any) => {
       const evalLispledArgs = evalLispArgs(args, ctx);
       let res = evalLispledArgs[0];
       let rest = evalLispledArgs.slice(1);

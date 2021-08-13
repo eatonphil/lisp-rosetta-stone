@@ -134,23 +134,23 @@ function evalLisp(ast, ctx) {
         return value;
     }
     var builtins = {
-        "<=": function (args, _) {
+        "<=": function (args) {
             var evalLispledArgs = evalLispArgs(args, ctx);
             return evalLispledArgs[0] <= evalLispledArgs[1];
         },
-        "if": function (args, _) {
+        "if": function (args) {
             var test = evalLisp(args.pair[0], ctx);
             if (test) {
                 return evalLisp(args.pair[1].pair[0], ctx);
             }
             return evalLisp(args.pair[1].pair[1].pair[0], ctx);
         },
-        "def": function (args, _) {
+        "def": function (args) {
             var evalLispledArg = evalLisp(args.pair[1].pair[0], ctx);
             ctx.set(args.pair[0].atom.value, evalLispledArg);
             return evalLispledArg;
         },
-        "lambda": function (args, _) {
+        "lambda": function (args) {
             var params = args.pair[0];
             var body = args.pair[1];
             return function (callArgs, callCtx) {
@@ -168,7 +168,7 @@ function evalLisp(ast, ctx) {
                 return evalLisp(begin, childCallCtx);
             };
         },
-        "begin": function (args, _) {
+        "begin": function (args) {
             var res = null;
             while (args) {
                 res = evalLisp(args.pair[0], ctx);
@@ -176,7 +176,7 @@ function evalLisp(ast, ctx) {
             }
             return res;
         },
-        "+": function (args, _) {
+        "+": function (args) {
             var res = 0;
             for (var _i = 0, _a = evalLispArgs(args, ctx); _i < _a.length; _i++) {
                 var arg = _a[_i];
@@ -184,7 +184,7 @@ function evalLisp(ast, ctx) {
             }
             return res;
         },
-        "-": function (args, _) {
+        "-": function (args) {
             var evalLispledArgs = evalLispArgs(args, ctx);
             var res = evalLispledArgs[0];
             var rest = evalLispledArgs.slice(1);
