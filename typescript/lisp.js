@@ -1,3 +1,4 @@
+"use strict";
 function makeSexpPair(pair) {
     return { kind: 'Pair', pair: pair };
 }
