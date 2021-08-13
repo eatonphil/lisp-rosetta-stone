@@ -147,7 +147,9 @@ function parse(tokens: Token[], cursor: number): [number, Sexp | null] {
   return [cursor, siblings];
 }
 
-function evalLispArgs(args: Sexp, ctx: Map<string, any>): any[] {
+type Context = Map<string, any>;
+
+function evalLispArgs(args: Sexp, ctx: Context): any[] {
   const evalLispledArgs: any[] = [];
   let currentArgNode: Sexp | null = args;
   while (currentArgNode) {
@@ -160,7 +162,7 @@ function evalLispArgs(args: Sexp, ctx: Map<string, any>): any[] {
   return evalLispledArgs;
 }
 
-function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
+function evalLisp(ast: Sexp, ctx: Context): any {
   if (ast.kind === 'Pair') {
     const fn = evalLisp(ast.pair[0], ctx);
     if (!fn) {
@@ -202,7 +204,7 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
       const params = args.pair[0];
       const body = args.pair[1];
 
-      return (callArgs: Sexp, callCtx: Map<string, any>) => {
+      return (callArgs: Sexp, callCtx: Context) => {
 	const evalLispledCallArgs = evalLispArgs(callArgs, callCtx);
 	const childCallCtx = new Map(callCtx);
 	let iter = params;
