@@ -222,9 +222,10 @@ function evalLisp(ast: Sexp, ctx: Context): any {
     },
     "begin": (args: any) => {
       let res = null;
-      while (args) {
-	res = evalLisp(args.pair[0], ctx);
-	args = args.pair[1];
+      let current = args;
+      while (current) {
+	res = evalLisp(current.pair[0], ctx);
+	current = current.pair[1];
       }
 
       return res;

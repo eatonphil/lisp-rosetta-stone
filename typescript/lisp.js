@@ -170,9 +170,10 @@ function evalLisp(ast, ctx) {
         },
         "begin": function (args) {
             var res = null;
-            while (args) {
-                res = evalLisp(args.pair[0], ctx);
-                args = args.pair[1];
+            var current = args;
+            while (current) {
+                res = evalLisp(current.pair[0], ctx);
+                current = current.pair[1];
             }
             return res;
         },
