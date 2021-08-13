@@ -1,14 +1,3 @@
-var __assign = (this && this.__assign) || function () {
-    __assign = Object.assign || function(t) {
-        for (var s, i = 1, n = arguments.length; i < n; i++) {
-            s = arguments[i];
-            for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-                t[p] = s[p];
-        }
-        return t;
-    };
-    return __assign.apply(this, arguments);
-};
 var Sexp = /** @class */ (function () {
     function Sexp(kind, atom, pair) {
         this.kind = kind;
@@ -131,7 +120,7 @@ function evalLisp(ast, ctx) {
     if (ast.atom.kind === 'Integer') {
         return +ast.atom.value;
     }
-    var value = ctx[ast.atom.value];
+    var value = ctx.get(ast.atom.value);
     if (value) {
         return value;
     }
@@ -149,7 +138,7 @@ function evalLisp(ast, ctx) {
         },
         "def": function (args, _) {
             var evalLispledArg = evalLisp(args.pair[1].pair[0], ctx);
-            ctx[args.pair[0].atom.value] = evalLispledArg;
+            ctx.set(args.pair[0].atom.value, evalLispledArg);
             return evalLispledArg;
         },
         "lambda": function (args, _) {
@@ -157,11 +146,11 @@ function evalLisp(ast, ctx) {
             var body = args.pair[1];
             return function (callArgs, callCtx) {
                 var evalLispledCallArgs = evalLispArgs(callArgs, callCtx);
-                var childCallCtx = __assign({}, callCtx);
+                var childCallCtx = new Map(callCtx);
                 var iter = params;
                 var i = 0;
                 while (iter) {
-                    childCallCtx[iter.pair[0].atom.value] = evalLispledCallArgs[i];
+                    childCallCtx.set(iter.pair[0].atom.value, evalLispledCallArgs[i]);
                     i++;
                     iter = iter.pair[1];
                 }
@@ -195,7 +184,7 @@ function evalLisp(ast, ctx) {
                 res -= arg;
             }
             return res;
-        }
+        },
     };
     if (!builtins[ast.atom.value]) {
         throw new Error("Undefined value: " + ast.atom.value);
@@ -215,7 +204,7 @@ function main() {
         (_a = parse(tokens, cursor + 1), cursor = _a[0], child = _a[1]);
         begin = Sexp.append(begin, child);
     }
-    var result = evalLisp(begin, {});
+    var result = evalLisp(begin, new Map);
     console.log(result);
 }
 main();

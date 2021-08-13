@@ -156,7 +156,7 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
     return +ast.atom.value;
   }
 
-  const value = ctx[ast.atom.value];
+  const value = ctx.get(ast.atom.value);
   if (value) {
     return value;
   }
@@ -176,20 +176,20 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
     },
     "def": (args, _) => {
       const evalLispledArg = evalLisp(args.pair[1].pair[0], ctx);
-      ctx[args.pair[0].atom.value] = evalLispledArg;
+      ctx.set(args.pair[0].atom.value, evalLispledArg);
       return evalLispledArg;
     },
     "lambda": (args, _) => {
       const params = args.pair[0];
       const body = args.pair[1];
 
-      return (callArgs, callCtx) => {
+      return (callArgs, callCtx: Map<string, any>) => {
 	const evalLispledCallArgs = evalLispArgs(callArgs, callCtx);
-	const childCallCtx = { ...callCtx };
+	const childCallCtx = new Map(callCtx);
 	let iter = params;
 	let i = 0;
 	while (iter) {
-	  childCallCtx[iter.pair[0].atom.value] = evalLispledCallArgs[i];
+	  childCallCtx.set(iter.pair[0].atom.value, evalLispledCallArgs[i]);
 	  i++;
 	  iter = iter.pair[1];
 	}
@@ -246,7 +246,7 @@ function main() {
     ([cursor, child] = parse(tokens, cursor+1));
     begin = Sexp.append(begin, child);
   }
-  const result = evalLisp(begin, {} as Map<string, any>);
+  const result = evalLisp(begin, new Map);
   console.log(result);
 }
 
