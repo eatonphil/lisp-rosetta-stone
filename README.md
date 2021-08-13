@@ -60,4 +60,12 @@ $ go run lisp.go "$(cat ../test.lisp)"
 144
 ```
 
-## Python (Coming Soon)
+## Python
+
+264 lines of code.
+
+```bash
+$ cd python
+$ python lisp.py "$(cat ../test.lisp)"
+144
+```
