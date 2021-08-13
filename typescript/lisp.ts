@@ -23,7 +23,7 @@ class Sexp {
     return `(${this.pair[0].pretty()} . ${this.pair[1].pretty()})`;
   }
 
-  static append(first: Sexp, second: Sexp) {
+  static append(first: Sexp, second: Sexp): Sexp {
     if (!first) {
       return new Sexp('Pair', null, [second, null]);
     }
@@ -162,11 +162,11 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
   }
 
   const builtins = {
-    "<=": (args, _) => {
+    "<=": (args:any , _:any) => {
       const evalLispledArgs = evalLispArgs(args, ctx);
       return evalLispledArgs[0] <= evalLispledArgs[1];
     },
-    "if": (args, _) => {
+    "if": (args:any , _:any) => {
       const test = evalLisp(args.pair[0], ctx);
       if (test) {
 	return evalLisp(args.pair[1].pair[0], ctx);
@@ -174,16 +174,16 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
       
       return evalLisp(args.pair[1].pair[1].pair[0], ctx);
     },
-    "def": (args, _) => {
+    "def": (args: any, _: any) => {
       const evalLispledArg = evalLisp(args.pair[1].pair[0], ctx);
       ctx.set(args.pair[0].atom.value, evalLispledArg);
       return evalLispledArg;
     },
-    "lambda": (args, _) => {
+    "lambda": (args: any, _: any) => {
       const params = args.pair[0];
       const body = args.pair[1];
 
-      return (callArgs, callCtx: Map<string, any>) => {
+      return (callArgs: Sexp, callCtx: Map<string, any>) => {
 	const evalLispledCallArgs = evalLispArgs(callArgs, callCtx);
 	const childCallCtx = new Map(callCtx);
 	let iter = params;
@@ -199,7 +199,7 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
 	return evalLisp(begin, childCallCtx);
       };
     },
-    "begin": (args, _) => {
+    "begin": (args: any, _: any) => {
       let res = null;
       while (args) {
 	res = evalLisp(args.pair[0], ctx);
@@ -208,7 +208,7 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
 
       return res;
     },
-    "+": (args, _) => {
+    "+": (args: any, _: any) => {
       let res = 0;
       for (let arg of evalLispArgs(args, ctx)) {
 	res += arg;
@@ -216,7 +216,7 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
 
       return res;
     },
-    "-": (args, _) => {
+    "-": (args: any, _: any) => {
       const evalLispledArgs = evalLispArgs(args, ctx);
       let res = evalLispledArgs[0];
       let rest = evalLispledArgs.slice(1);
@@ -227,12 +227,14 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
     },
   };
 
-  if (!builtins[ast.atom.value]) {
+  const key = ast.atom.value as keyof typeof builtins;
+
+  if (!builtins[key]) {
     throw new Error("Undefined value: " + ast.atom.value);
     return null;
   }
 
-  return builtins[ast.atom.value];
+  return builtins[key];
 }
 
 function main() {

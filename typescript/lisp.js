@@ -186,11 +186,12 @@ function evalLisp(ast, ctx) {
             return res;
         },
     };
-    if (!builtins[ast.atom.value]) {
+    var key = ast.atom.value;
+    if (!builtins[key]) {
         throw new Error("Undefined value: " + ast.atom.value);
         return null;
     }
-    return builtins[ast.atom.value];
+    return builtins[key];
 }
 function main() {
     var _a;
