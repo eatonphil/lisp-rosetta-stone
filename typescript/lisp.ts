@@ -12,8 +12,12 @@ interface SexpPair {
 
 type Sexp = SexpAtom | SexpPair;
 
-function makeSexp(kind: SexpKind, atom: Token, pair: [Sexp, Sexp]): Sexp {
-  return kind === 'Atom' ? { kind, atom } :  { kind, pair };
+function makeSexpPair(pair: [Sexp, Sexp]): SexpPair {
+  return { kind: 'Pair', pair };
+}
+
+function makeSexpAtom(atom: Token): SexpAtom {
+  return { kind: 'Atom', atom };
 }
 
 function pretty(sexp: Sexp): string {
@@ -30,14 +34,14 @@ function pretty(sexp: Sexp): string {
 
 function append(first: Sexp, second: Sexp): Sexp {
   if (!first) {
-    return makeSexp('Pair', null, [second, null]);
+    return makeSexpPair([second, null]);
   }
 
   if (first.kind === 'Atom') {
-    return makeSexp('Pair', null, [first, second]);
+    return makeSexpPair([first, second]);
   }
 
-  return makeSexp('Pair', null, [first.pair[0], append(first.pair[1], second)]);
+  return makeSexpPair([first.pair[0], append(first.pair[1], second)]);
 }
 
 
@@ -130,7 +134,7 @@ function parse(tokens: Token[], cursor: number): [number, Sexp] {
       return [cursor, siblings];
     }
 
-    const s = makeSexp('Atom', t, null);
+    const s = makeSexpAtom(t);
     siblings = append(siblings, s);
   }
 
@@ -202,7 +206,7 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
 	  iter = iter.pair[1];
 	}
 
-	let begin = makeSexp('Atom', new Token("begin", 'Identifier'), null);
+	let begin: Sexp = makeSexpAtom(new Token("begin", 'Identifier'));
 	begin = append(begin, body);
 	return evalLisp(begin, childCallCtx);
       };
@@ -248,7 +252,7 @@ function evalLisp(ast: Sexp, ctx: Map<string, any>): any {
 function main() {
   const program = process.argv[2];
   const tokens = lex(program);
-  let begin = makeSexp('Atom', new Token("begin", 'Identifier'), null);
+  let begin: Sexp = makeSexpAtom(new Token("begin", 'Identifier'));
   begin = append(begin, null);
   let [cursor, child] = parse(tokens, 0);
   begin = append(begin, child);

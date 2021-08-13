@@ -1,5 +1,8 @@
-function makeSexp(kind, atom, pair) {
-    return kind === 'Atom' ? { kind: kind, atom: atom } : { kind: kind, pair: pair };
+function makeSexpPair(pair) {
+    return { kind: 'Pair', pair: pair };
+}
+function makeSexpAtom(atom) {
+    return { kind: 'Atom', atom: atom };
 }
 function pretty(sexp) {
     if (sexp.kind === 'Atom') {
@@ -12,12 +15,12 @@ function pretty(sexp) {
 }
 function append(first, second) {
     if (!first) {
-        return makeSexp('Pair', null, [second, null]);
+        return makeSexpPair([second, null]);
     }
     if (first.kind === 'Atom') {
-        return makeSexp('Pair', null, [first, second]);
+        return makeSexpPair([first, second]);
     }
-    return makeSexp('Pair', null, [first.pair[0], append(first.pair[1], second)]);
+    return makeSexpPair([first.pair[0], append(first.pair[1], second)]);
 }
 var Token = /** @class */ (function () {
     function Token(value, kind) {
@@ -89,7 +92,7 @@ function parse(tokens, cursor) {
         if (t.value === ")") {
             return [cursor, siblings];
         }
-        var s = makeSexp('Atom', t, null);
+        var s = makeSexpAtom(t);
         siblings = append(siblings, s);
     }
     return [cursor, siblings];
@@ -152,7 +155,7 @@ function evalLisp(ast, ctx) {
                     i++;
                     iter = iter.pair[1];
                 }
-                var begin = makeSexp('Atom', new Token("begin", 'Identifier'), null);
+                var begin = makeSexpAtom(new Token("begin", 'Identifier'));
                 begin = append(begin, body);
                 return evalLisp(begin, childCallCtx);
             };
@@ -195,7 +198,7 @@ function main() {
     var _a;
     var program = process.argv[2];
     var tokens = lex(program);
-    var begin = makeSexp('Atom', new Token("begin", 'Identifier'), null);
+    var begin = makeSexpAtom(new Token("begin", 'Identifier'));
     begin = append(begin, null);
     var _b = parse(tokens, 0), cursor = _b[0], child = _b[1];
     begin = append(begin, child);
