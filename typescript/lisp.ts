@@ -274,7 +274,6 @@ function evalLisp(ast: Sexp, ctx: Context): any {
 
   if (!builtins[key]) {
     throw new Error("Undefined value: " + ast.atom.value);
-    return null;
   }
 
   return builtins[key];
