@@ -121,9 +121,14 @@ function evalLisp(ast, ctx) {
         var fn = evalLisp(ast.pair[0], ctx);
         if (!fn) {
             throw new Error("Unknown function: " + pretty(ast.pair[0]));
-            return null;
+        }
+        if (typeof fn != "function") {
+            throw new Error("Not a function: " + pretty(ast.pair[0]));
         }
         var args = ast.pair[1];
+        if ((args === null || args === void 0 ? void 0 : args.kind) !== 'Pair') {
+            throw new Error("Not a linked list: " + (args ? pretty(args) : "null"));
+        }
         return fn(args, ctx);
     }
     if (ast.atom.kind === 'Integer') {
@@ -193,12 +198,17 @@ function evalLisp(ast, ctx) {
                 res = evalLisp(current.pair[0], ctx);
                 current = current.pair[1];
             }
+            // TODO: Fix non-null assertion. Valid because the `current` value is initialized to
+            // non-null, meaning the `res` value will be non-null.
             return res;
         },
         "+": function (args) {
             var res = 0;
             for (var _i = 0, _a = evalLispArgs(args, ctx); _i < _a.length; _i++) {
                 var arg = _a[_i];
+                if (typeof arg !== 'number') {
+                    throw new Error("+ expects number arguments.");
+                }
                 res += arg;
             }
             return res;
@@ -206,9 +216,15 @@ function evalLisp(ast, ctx) {
         "-": function (args) {
             var evalLispledArgs = evalLispArgs(args, ctx);
             var res = evalLispledArgs[0];
+            if (typeof res !== 'number') {
+                throw new Error("- expects number arguments.");
+            }
             var rest = evalLispledArgs.slice(1);
             for (var _i = 0, rest_1 = rest; _i < rest_1.length; _i++) {
                 var arg = rest_1[_i];
+                if (typeof arg !== 'number') {
+                    throw new Error("- expects number arguments.");
+                }
                 res -= arg;
             }
             return res;
@@ -217,7 +233,6 @@ function evalLisp(ast, ctx) {
     var key = ast.atom.value;
     if (!builtins[key]) {
         throw new Error("Undefined value: " + ast.atom.value);
-        return null;
     }
     return builtins[key];
 }

@@ -147,10 +147,10 @@ function parse(tokens: Token[], cursor: number): [number, Sexp | null] {
   return [cursor, siblings];
 }
 
-type Context = Map<string, any>;
+type Context = Map<string, EvalReturnType>;
 
-function evalLispArgs(args: Sexp, ctx: Context): any[] {
-  const evalLispledArgs: SexpPair[] = [];
+function evalLispArgs(args: Sexp, ctx: Context) {
+  const evalLispledArgs: EvalReturnType[] = [];
   let currentArgNode: Sexp | null = args;
   while (currentArgNode) {
     if(currentArgNode.kind !== "Pair") {
@@ -162,13 +162,21 @@ function evalLispArgs(args: Sexp, ctx: Context): any[] {
   return evalLispledArgs;
 }
 
-function evalLisp(ast: Sexp, ctx: Context): any {
+type EvalReturnType = number | boolean | ((callArgs: SexpPair, callCtx: Context) => EvalReturnType);
+
+function evalLisp(ast: Sexp, ctx: Context): EvalReturnType {
   if (ast.kind === 'Pair') {
     const fn = evalLisp(ast.pair[0], ctx);
     if (!fn) {
       throw new Error("Unknown function: " + pretty(ast.pair[0]));
     }
+    if (typeof fn != "function") {
+      throw new Error("Not a function: " + pretty(ast.pair[0]));
+    }
     const args = ast.pair[1];
+    if (args?.kind !== 'Pair') {
+      throw new Error("Not a linked list: " + (args ? pretty(args) : "null"));
+    }
     return fn(args, ctx);
   }
 
@@ -249,11 +257,16 @@ function evalLisp(ast: Sexp, ctx: Context): any {
 	current = current.pair[1];
       }
 
-      return res;
+      // TODO: Fix non-null assertion. Valid because the `current` value is initialized to
+      // non-null, meaning the `res` value will be non-null.
+      return res!;
     },
     "+": (args: SexpPair) => {
       let res = 0;
       for (let arg of evalLispArgs(args, ctx)) {
+        if (typeof arg !== 'number') {
+          throw new Error("+ expects number arguments.");
+        }
 	res += arg;
       }
 
@@ -262,8 +275,14 @@ function evalLisp(ast: Sexp, ctx: Context): any {
     "-": (args: SexpPair) => {
       const evalLispledArgs = evalLispArgs(args, ctx);
       let res = evalLispledArgs[0];
-      let rest = evalLispledArgs.slice(1);
+      if (typeof res !== 'number') {
+        throw new Error("- expects number arguments.");
+      }
+    let rest = evalLispledArgs.slice(1);
       for (let arg of rest) {
+        if (typeof arg !== 'number') {
+          throw new Error("- expects number arguments.");
+        }
 	res -= arg;
       }
       return res;
