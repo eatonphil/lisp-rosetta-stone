@@ -1,6 +1,6 @@
 import sys
 from enum import Enum
-from typing import Any, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 class TokenKind(Enum):
@@ -8,7 +8,7 @@ class TokenKind(Enum):
     IDENTIFIER = 2
     SYNTAX = 3
 
-    
+
 class Token():
     value: str
     kind: TokenKind
@@ -63,7 +63,7 @@ def lex_integer(program: str, cursor: int) -> Tuple[int, Token]:
 
     return end, Token(program[cursor:end], TokenKind.INTEGER)
 
-    
+
 def lex_identifier(program: str, cursor: int) -> Tuple[int, Token]:
     c = program[cursor]
     end = cursor
@@ -77,7 +77,7 @@ def lex_identifier(program: str, cursor: int) -> Tuple[int, Token]:
     return end, Token(program[cursor:end], TokenKind.IDENTIFIER)
 
 
-def lex(program: str) -> list[Token]:
+def lex(program: str) -> List[Token]:
     tokens = []
     i = 0
     while i < len(program):
@@ -109,7 +109,7 @@ def lex(program: str) -> list[Token]:
     return tokens
 
 
-def parse(tokens: list[Token], cursor: int) -> Tuple[int, Sexp]:
+def parse(tokens: List[Token], cursor: int) -> Tuple[int, Sexp]:
     siblings = None
 
     if tokens[cursor].value != "(":
@@ -135,7 +135,7 @@ def parse(tokens: list[Token], cursor: int) -> Tuple[int, Sexp]:
     return cursor, siblings
 
 
-def eval_lisp_args(args: Sexp, ctx: dict[str, Any]) -> list[Any]:
+def eval_lisp_args(args: Sexp, ctx: Dict[str, Any]) -> List[Any]:
     evalled_args = []
     while args:
         evalled_args.append(eval_lisp(args.pair[0], ctx))
@@ -144,12 +144,12 @@ def eval_lisp_args(args: Sexp, ctx: dict[str, Any]) -> list[Any]:
     return evalled_args
 
 
-def builtin_lt(args: Sexp, ctx: dict[str, Any]) -> Any:
+def builtin_lt(args: Sexp, ctx: Dict[str, Any]) -> Any:
     evalled_args = eval_lisp_args(args, ctx)
     return evalled_args[0] <= evalled_args[1]
 
 
-def builtin_if(args: Sexp, ctx: dict[str, Any]) -> Any:
+def builtin_if(args: Sexp, ctx: Dict[str, Any]) -> Any:
     test = eval_lisp(args.pair[0], ctx)
     if test:
         return eval_lisp(args.pair[1].pair[0], ctx)
@@ -157,7 +157,7 @@ def builtin_if(args: Sexp, ctx: dict[str, Any]) -> Any:
     return eval_lisp(args.pair[1].pair[1].pair[0], ctx)
 
 
-def builtin_def(args: Sexp, ctx: dict[str, Any]) -> Any:
+def builtin_def(args: Sexp, ctx: Dict[str, Any]) -> Any:
     evalled_arg = eval_lisp(args.pair[1].pair[0], ctx)
     ctx[args.pair[0].atom.value] = evalled_arg
     return evalled_arg
@@ -167,7 +167,7 @@ def builtin_lambda(args: Sexp, _) -> Any:
     params = args.pair[0]
     body = args.pair[1]
 
-    def _lambda_internal(call_args: Sexp, call_ctx: dict[str, Any]) -> Any:
+    def _lambda_internal(call_args: Sexp, call_ctx: Dict[str, Any]) -> Any:
         evalled_call_args = eval_lisp_args(call_args, call_ctx)
         child_call_ctx = {}
         for key, val in call_ctx.items():
@@ -187,7 +187,7 @@ def builtin_lambda(args: Sexp, _) -> Any:
     return _lambda_internal
 
 
-def builtin_begin(args: Sexp, ctx: dict[str, Any]) -> Any:
+def builtin_begin(args: Sexp, ctx: Dict[str, Any]) -> Any:
     res = None
     while args:
         res = eval_lisp(args.pair[0], ctx)
@@ -196,7 +196,7 @@ def builtin_begin(args: Sexp, ctx: dict[str, Any]) -> Any:
     return res
 
 
-def builtin_plus(args: Sexp, ctx: dict[str, any]) -> Any:
+def builtin_plus(args: Sexp, ctx: Dict[str, any]) -> Any:
     res = 0
     args = eval_lisp_args(args, ctx)
     for arg in args:
@@ -205,7 +205,7 @@ def builtin_plus(args: Sexp, ctx: dict[str, any]) -> Any:
     return res
 
 
-def builtin_minus(args: Sexp, ctx: dict[str, Any]) -> Any:
+def builtin_minus(args: Sexp, ctx: Dict[str, Any]) -> Any:
     evalled_args = eval_lisp_args(args, ctx)
     res = evalled_args[0]
     rest = evalled_args[1:]
@@ -225,7 +225,7 @@ BUILTINS = {
 }
 
 
-def eval_lisp(ast: Sexp, ctx: dict[str, Any]) -> Any:
+def eval_lisp(ast: Sexp, ctx: Dict[str, Any]) -> Any:
     if ast.kind == SexpKind.PAIR:
         fn = eval_lisp(ast.pair[0], ctx)
         if not fn:
