@@ -2,49 +2,37 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"os"
+	"strconv"
 )
 
-type SexpKind uint
-
-const (
-	Atom SexpKind = iota
-	Pair
-)
-
-type Sexp struct {
-	kind SexpKind
-	atom *Token
-	pair *struct {
-		car Sexp
-		cdr *Sexp
-	}
+type Sexp interface {
+	eval(ctx Ctx) interface{}
 }
 
-func (s Sexp) pretty() string {
-	if s.kind == Atom {
-		return s.atom.value
-	}
-
-	if s.pair.cdr == nil {
-		return fmt.Sprintf("(%s . NIL)", s.pair.car.pretty())
-	}
-
-	return fmt.Sprintf("(%s . %s)", s.pair.car.pretty(), s.pair.cdr.pretty())
+type Atom Token
+type Pair struct {
+	car Sexp
+	cdr Sexp
 }
 
-func sexpAppend(first *Sexp, second *Sexp) Sexp {
-	if first == nil {
-		return Sexp{Pair, nil, &struct{car Sexp; cdr *Sexp}{*second, nil}}
-	}
+func (a Atom) String() string {
+	return a.value
+}
 
-	if first.kind == Atom {
-		return Sexp{Pair, nil, &struct{car Sexp; cdr *Sexp}{*first, second}}
-	}
+func (p Pair) String() string {
+	return fmt.Sprintf("(%s . %s)", p.car, p.cdr)
+}
 
-	appended := sexpAppend(first.pair.cdr, second)
-	return Sexp{Pair, nil, &struct{car Sexp; cdr *Sexp}{first.pair.car, &appended}}
+func sexpAppend(first Sexp, second Sexp) Sexp {
+	switch first := first.(type) {
+	case Atom:
+		return Pair{first, second}
+	case Pair:
+		return Pair{first.car, sexpAppend(first.cdr, second)}
+	default:
+		return Pair{second, nil}
+	}
 }
 
 type TokenKind uint
@@ -99,7 +87,7 @@ outer:
 			continue
 		}
 
-		lexers := []func(string, int)(int, Token){lexInteger, lexIdentifier}
+		lexers := []func(string, int) (int, Token){lexInteger, lexIdentifier}
 		for _, lexer := range lexers {
 			newCursor, token := lexer(program, i)
 			if newCursor == i {
@@ -118,7 +106,7 @@ outer:
 }
 
 func parse(tokens []Token, cursor int) (int, Sexp) {
-	var siblings *Sexp = nil
+	var siblings Sexp = nil
 
 	if tokens[cursor].value != "(" {
 		panic("Expected opening parenthesis, got: " + tokens[cursor].value)
@@ -130,114 +118,110 @@ func parse(tokens []Token, cursor int) (int, Sexp) {
 		t := tokens[cursor]
 		if t.value == "(" {
 			newCursor, child := parse(tokens, cursor)
-			appended := sexpAppend(siblings, &child)
-			siblings = &appended
+			siblings = sexpAppend(siblings, child)
 			cursor = newCursor
 			continue
 		}
 
 		if t.value == ")" {
-			return cursor, *siblings
+			return cursor, siblings
 		}
 
-		s := Sexp{Atom, &t, nil}
-		appended := sexpAppend(siblings, &s)
-		siblings = &appended
+		s := Atom(t)
+		siblings = sexpAppend(siblings, s)
 	}
 
-	return cursor, *siblings
+	return cursor, siblings
 }
 
-func evalLispArgs(args Sexp, ctx map[string]interface{}) []interface{} {
-	var evalledArgs []interface{}
-	iter := &args
-	for iter != nil {
-		evalledArgs = append(evalledArgs, evalLisp(iter.pair.car, ctx))
-		iter = iter.pair.cdr
+func evalLispArgs(args Sexp, ctx Ctx) []interface{} {
+	if p, ok := args.(Pair); ok {
+		return append([]interface{}{p.car.eval(ctx)}, evalLispArgs(p.cdr, ctx)...)
 	}
-	return evalledArgs
+	return nil
 }
 
-func evalLisp(ast Sexp, ctx map[string]interface{}) interface{} {
-	if ast.kind == Pair {
-		fn := evalLisp(ast.pair.car, ctx)
-		if fn == nil {
-			panic(fmt.Sprintf(("Unknown func: " + ast.pair.car.pretty())))
-		}
-		return fn.(func(Sexp, map[string]interface{})interface{})(*ast.pair.cdr, ctx)
-	}
+type Ctx map[string]interface{}
 
-	if ast.atom.kind == Integer {
-		i, _ := strconv.Atoi(ast.atom.value)
+func (p Pair) eval(ctx Ctx) interface{} {
+	if fn, ok := p.car.eval(ctx).(func(args Sexp, _ Ctx) interface{}); ok {
+		return fn(p.cdr, ctx)
+	}
+	panic(fmt.Sprintf("Unknown func: %s", p.car))
+}
+
+func (a Atom) eval(ctx Ctx) interface{} {
+	if a.kind == Integer {
+		i, _ := strconv.Atoi(a.value)
 		return i
 	}
 
-	value, ok := ctx[ast.atom.value]
-	if ok {
+	if value, ok := ctx[a.value]; ok {
 		return value
 	}
 
-	var builtins = map[string]func(Sexp, map[string]interface{}) interface{}{
-		"<=": func(args Sexp, _ map[string]interface{}) interface{} {
+	switch a.value {
+	case "<=":
+		return func(args Sexp, _ Ctx) interface{} {
 			evalledArgs := evalLispArgs(args, ctx)
 			return evalledArgs[0].(int) <= evalledArgs[1].(int)
-		},
-		"if": func(args Sexp, _ map[string]interface{}) interface{} {
-			test := evalLisp(args.pair.car, ctx)
+		}
+	case "if":
+		return func(args Sexp, _ Ctx) interface{} {
+			p := args.(Pair)
+			test := p.car.eval(ctx)
 			if test.(bool) {
-				return evalLisp(args.pair.cdr.pair.car, ctx)
+				return p.cdr.(Pair).car.eval(ctx)
 			}
-
-			return evalLisp(args.pair.cdr.pair.cdr.pair.car, ctx)
-		},
-		"def": func(args Sexp, _ map[string]interface{}) interface{} {
-			evalledArg := evalLisp(args.pair.cdr.pair.car, ctx)
-			ctx[args.pair.car.atom.value] = evalledArg
+			return p.cdr.(Pair).cdr.(Pair).car.eval(ctx)
+		}
+	case "def":
+		return func(args Sexp, _ Ctx) interface{} {
+			p := args.(Pair)
+			evalledArg := p.cdr.(Pair).car.eval(ctx)
+			ctx[p.car.(Atom).value] = evalledArg
 			return evalledArg
-		},
-		"lambda": func(args Sexp, _ map[string]interface{}) interface{} {
-			params := args.pair.car
-			body := args.pair.cdr
+		}
+	case "lambda":
+		return func(args Sexp, _ Ctx) interface{} {
+			p := args.(Pair)
+			params := p.car
+			body := p.cdr
 
-			return func(callArgs Sexp, callCtx map[string]interface{}) interface{} {
+			return func(callArgs Sexp, callCtx Ctx) interface{} {
 				evalledCallArgs := evalLispArgs(callArgs, callCtx)
-				childCallCtx := map[string]interface{}{}
+				childCallCtx := Ctx{}
 				for key, val := range callCtx {
 					childCallCtx[key] = val
 				}
 
-				iter := &params
-				i := 0
-				for iter != nil {
-					childCallCtx[iter.pair.car.atom.value] = evalledCallArgs[i]
-					i++
-					iter = iter.pair.cdr
+				iter := params
+				for i := 0; iter != nil; i++ {
+					childCallCtx[iter.(Pair).car.(Atom).value] = evalledCallArgs[i]
+					iter = iter.(Pair).cdr
 				}
 
-				begin := Sexp{Atom, &Token{"begin", Identifier}, nil}
-				begin = sexpAppend(&begin, body)
-				return evalLisp(begin, childCallCtx)
+				var begin Sexp = Atom(Token{"begin", Identifier})
+				begin = sexpAppend(begin, body)
+				return begin.eval(childCallCtx)
 			}
-		},
-		"begin": func(args Sexp, _ map[string]interface{}) interface{} {
-			var res interface{}
-			iter := &args
-			for iter != nil {
-				res = evalLisp(iter.pair.car, ctx)
-				iter = iter.pair.cdr
-			}
-
-			return res
-		},
-		"+": func(args Sexp, _ map[string]interface{}) interface{} {
+		}
+	case "begin":
+		return func(args Sexp, _ Ctx) interface{} {
+			res := evalLispArgs(args, ctx)
+			return res[len(res)-1]
+		}
+	case "+":
+		return func(args Sexp, _ Ctx) interface{} {
 			res := 0
 			for _, arg := range evalLispArgs(args, ctx) {
 				res += arg.(int)
 			}
 
 			return res
-		},
-		"-": func(args Sexp, _ map[string]interface{}) interface{} {
+		}
+	case "-":
+		return func(args Sexp, _ Ctx) interface{} {
 			var evalledArgs = evalLispArgs(args, ctx)
 			var res = evalledArgs[0].(int)
 			var rest = evalledArgs[1:]
@@ -245,28 +229,23 @@ func evalLisp(ast Sexp, ctx map[string]interface{}) interface{} {
 				res -= arg.(int)
 			}
 			return res
-		},
+		}
+	default:
+		panic("Undefined value :" + a.value)
 	}
-
-	value, ok = builtins[ast.atom.value]
-	if !ok {
-		panic("Undefined value :" + ast.atom.value)
-	}
-
-	return value
 }
 
 func main() {
 	program := os.Args[1]
 	tokens := lex(program)
-	begin := Sexp{Atom, &Token{"begin", Identifier}, nil}
-	begin = sexpAppend(&begin, nil)
+	var begin Sexp = Atom(Token{"begin", Identifier})
+	begin = sexpAppend(begin, nil)
 	cursor, child := parse(tokens, 0)
-	begin = sexpAppend(&begin, &child)
+	begin = sexpAppend(begin, child)
 	for cursor != len(tokens)-1 {
 		cursor, child = parse(tokens, cursor+1)
-		begin = sexpAppend(&begin, &child)
+		begin = sexpAppend(begin, child)
 	}
-	result := evalLisp(begin, map[string]interface{}{})
+	result := begin.eval(Ctx{})
 	fmt.Println(result)
 }
