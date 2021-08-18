@@ -69,3 +69,13 @@ $ cd python
 $ python lisp.py "$(cat ../test.lisp)"
 144
 ```
+
+## Swift
+
+211 lines of code.
+
+```bash
+$ cd swift
+$ swift main.swift "$(cat ../test.lisp)"
+144
+```
