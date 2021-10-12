@@ -1,76 +1,79 @@
 import sys
-from enum import Enum
-from typing import Any, Tuple
+from enum import auto, Enum, unique
+from typing import Any, NamedTuple, Optional, Tuple
 
 
+@unique
 class TokenKind(Enum):
-    INTEGER = 1
-    IDENTIFIER = 2
-    SYNTAX = 3
+    INTEGER = auto()
+    IDENTIFIER = auto()
+    SYNTAX = auto()
 
-    
-class Token():
+
+class Token(NamedTuple):
     value: str
     kind: TokenKind
 
-    def __init__(self, value, kind):
-        self.value = value
-        self.kind = kind
 
-
+@unique
 class SexpKind(Enum):
-    ATOM = 1
-    PAIR = 2
+    ATOM = auto()
+    PAIR = auto()
 
 
-class Sexp():
+class Sexp(NamedTuple):
     kind: SexpKind
-    atom: Token
-    pair: Tuple['Sexp', 'Sexp']
+    atom: Optional[Token]
+    pair: Tuple
 
-    def __init__(self, kind, atom, pair):
-        self.kind = kind
-        self.atom = atom
-        self.pair = pair
-
-    def pretty(self) -> str:
+    def __str__(self) -> str:
         if self.kind == SexpKind.ATOM:
+            assert self.atom is not None
             return self.atom.value
 
         if self.pair[1] is None:
-            return f'({self.pair[0].pretty()} . NIL)'
+            return f'({self.pair[0]!s} . NIL)'
 
-        return f'({self.pair[0].pretty()} . {self.pair[1].pretty()})'
+        return f'({self.pair[0]!s} . {self.pair[1]!s})'
+
+    @staticmethod
+    def create_pair(head, tail):
+        return Sexp(SexpKind.PAIR, None, (head, tail))
+
+    @staticmethod
+    def create_atom(token):
+        return Sexp(SexpKind.ATOM, token, (None, None))
 
 
-def sexp_append(first: Sexp, second: Sexp) -> Sexp:
+def sexp_append(first: Optional[Sexp], second: Optional[Sexp]) -> Sexp:
     if first is None:
-        return Sexp(SexpKind.PAIR, None, [second, None])
+        assert second is not None
+        return Sexp.create_pair(second, None)
 
     if first.kind == SexpKind.ATOM:
-        return Sexp(SexpKind.PAIR, None, [first, second])
+        return Sexp.create_pair(first, second)
 
     appended = sexp_append(first.pair[1], second)
-    return Sexp(SexpKind.PAIR, None, [first.pair[0], appended])
+    return Sexp.create_pair(first.pair[0], appended)
 
 
 def lex_integer(program: str, cursor: int) -> Tuple[int, Token]:
     c = program[cursor]
     end = cursor
-    while c >= '0' and c <= '9':
+    while '0' <= c <= '9':
         end += 1
         c = program[end]
 
     return end, Token(program[cursor:end], TokenKind.INTEGER)
 
-    
+
 def lex_identifier(program: str, cursor: int) -> Tuple[int, Token]:
     c = program[cursor]
     end = cursor
-    while (c >= 'a' and c <= 'z') or \
-          (c >= 'A' and c <= 'Z') or \
-          c in ['+', '-', '*', '&', '$', '%', '<', '='] or \
-          (end > cursor and c >= '0' and c <= '9'):
+    while ('a' <= c <= 'z') or \
+            ('A' <= c <= 'Z') or \
+            c in '+-*&$%<=' or \
+            (end > cursor and '0' <= c <= '9'):
         end += 1
         c = program[end]
 
@@ -82,38 +85,38 @@ def lex(program: str) -> list[Token]:
     i = 0
     while i < len(program):
         c = program[i]
-        if c == ' ' or c == '\n' or c == '\t' or c == '\r':
+        if c in ' \n\t\r':
             i += 1
             continue
 
-        if c == ')' or c == '(':
+        if c in '()':
             tokens.append(Token(c, TokenKind.SYNTAX))
             i += 1
             continue
 
-        lexers = [lex_integer, lex_identifier]
-        found = False
-        for lexer in lexers:
+        for lexer in [lex_integer, lex_identifier]:
             new_cursor, token = lexer(program, i)
             if new_cursor == i:
                 continue
 
             i = new_cursor
             tokens.append(token)
-            found = True
             break
-
-        if not found:
-            raise Exception(fmt.Sprintf("Unknown token near '%s' at index '%d'", program[i:], i))
+        else:
+            raise SyntaxError(
+                f"Unknown token near '{program[i:]}' at index '{i}'"
+            )
 
     return tokens
 
 
-def parse(tokens: list[Token], cursor: int) -> Tuple[int, Sexp]:
+def parse(tokens: list[Token], cursor: int) -> Tuple[int, Optional[Sexp]]:
     siblings = None
 
     if tokens[cursor].value != "(":
-        raise Exception("Expected opening parenthesis, got: " + tokens[cursor].value)
+        raise ValueError(
+            "Expected opening parenthesis, got: " + tokens[cursor].value
+        )
 
     cursor += 1
 
@@ -128,7 +131,7 @@ def parse(tokens: list[Token], cursor: int) -> Tuple[int, Sexp]:
         if t.value == ")":
             return cursor, siblings
 
-        s = Sexp(SexpKind.ATOM, t, None)
+        s = Sexp.create_atom(t)
         siblings = sexp_append(siblings, s)
         cursor += 1
 
@@ -169,9 +172,7 @@ def builtin_lambda(args: Sexp, _) -> Any:
 
     def _lambda_internal(call_args: Sexp, call_ctx: dict[str, Any]) -> Any:
         evalled_call_args = eval_lisp_args(call_args, call_ctx)
-        child_call_ctx = {}
-        for key, val in call_ctx.items():
-            child_call_ctx[key] = val
+        child_call_ctx = call_ctx.copy()
 
         i = 0
         it = params
@@ -180,7 +181,7 @@ def builtin_lambda(args: Sexp, _) -> Any:
             i += 1
             it = it.pair[1]
 
-        begin = Sexp(SexpKind.ATOM, Token("begin", TokenKind.IDENTIFIER), None)
+        begin = Sexp.create_atom(Token("begin", TokenKind.IDENTIFIER))
         begin = sexp_append(begin, body)
         return eval_lisp(begin, child_call_ctx)
 
@@ -196,22 +197,14 @@ def builtin_begin(args: Sexp, ctx: dict[str, Any]) -> Any:
     return res
 
 
-def builtin_plus(args: Sexp, ctx: dict[str, any]) -> Any:
-    res = 0
-    args = eval_lisp_args(args, ctx)
-    for arg in args:
-        res += arg
-
-    return res
+def builtin_plus(args: Sexp, ctx: dict[str, Any]) -> Any:
+    return sum(eval_lisp_args(args, ctx))
 
 
 def builtin_minus(args: Sexp, ctx: dict[str, Any]) -> Any:
     evalled_args = eval_lisp_args(args, ctx)
-    res = evalled_args[0]
-    rest = evalled_args[1:]
-    for arg in rest:
-        res -= arg
-    return res
+    evalled_args[0] *= -1
+    return -sum(evalled_args)
 
 
 BUILTINS = {
@@ -229,10 +222,11 @@ def eval_lisp(ast: Sexp, ctx: dict[str, Any]) -> Any:
     if ast.kind == SexpKind.PAIR:
         fn = eval_lisp(ast.pair[0], ctx)
         if not fn:
-            raise Exception("Unknown def: " + ast.pair[0].pretty())
+            raise LookupError(f"Unknown def: {ast.pair[0]!s}")
 
         return fn(ast.pair[1], ctx)
 
+    assert ast.atom is not None
     if ast.atom.kind == TokenKind.INTEGER:
         return int(ast.atom.value)
 
@@ -240,7 +234,7 @@ def eval_lisp(ast: Sexp, ctx: dict[str, Any]) -> Any:
         return ctx[ast.atom.value]
 
     if ast.atom.value not in BUILTINS:
-        raise Exception("Undefined value :" + ast.atom.value)
+        raise LookupError("Undefined value: " + ast.atom.value)
 
     return BUILTINS[ast.atom.value]
 
@@ -249,12 +243,12 @@ def main():
     program = sys.argv[1]
     tokens = lex(program)
 
-    begin = Sexp(SexpKind.ATOM, Token("begin", TokenKind.IDENTIFIER), None)
+    begin = Sexp.create_atom(Token("begin", TokenKind.IDENTIFIER))
     begin = sexp_append(begin, None)
 
     cursor = -1
-    while cursor != len(tokens)-1:
-        cursor, child = parse(tokens, cursor+1)
+    while cursor < len(tokens) - 1:
+        cursor, child = parse(tokens, cursor + 1)
         begin = sexp_append(begin, child)
 
     result = eval_lisp(begin, {})
