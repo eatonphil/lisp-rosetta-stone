@@ -69,3 +69,13 @@ $ cd python
 $ python lisp.py "$(cat ../test.lisp)"
 144
 ```
+
+## Ruby
+
+149 lines of code.
+
+```bash
+$ cd ruby
+$ ruby lisp.rb "$(cat ../test.lisp)"
+144
+```
